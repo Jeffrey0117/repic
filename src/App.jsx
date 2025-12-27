@@ -4,7 +4,7 @@ import { Dropzone } from './features/viewer/Dropzone';
 import { ImageViewer } from './features/viewer/ImageViewer';
 import { ImageCropper } from './features/editor/ImageCropper';
 import { Button } from './components/ui/Button';
-import { Crop, X, Trash2, Download, Camera } from 'lucide-react';
+import { Crop, X, Trash2, Download, Camera, FolderOpen } from 'lucide-react';
 import { captureScreen } from './utils/capture';
 
 function App() {
@@ -22,9 +22,13 @@ function App() {
     const screenshot = await captureScreen();
     if (screenshot) {
       setImage(screenshot);
-      setIsEditing(false); // Can optionally go straight to edit if desired
+      setIsEditing(true); // Immediately enter crop mode for "Regional Capture" feel
     }
     setIsCapturing(false);
+  };
+
+  const handleOpenFile = () => {
+    document.getElementById('file-upload-toolbar').click();
   };
 
   const handleCropComplete = (croppedImg) => {
@@ -41,6 +45,21 @@ function App() {
 
   return (
     <div className="h-screen w-screen bg-background overflow-hidden relative select-none">
+
+      {/* Hidden Global File Input for Toolbar */}
+      <input
+        type="file"
+        accept="image/*"
+        className="hidden"
+        id="file-upload-toolbar"
+        onChange={(e) => {
+          if (e.target.files && e.target.files[0]) {
+            const reader = new FileReader();
+            reader.onload = (ev) => handleImageUpload(ev.target.result);
+            reader.readAsDataURL(e.target.files[0]);
+          }
+        }}
+      />
 
       {/* 1. Upload View */}
       <AnimatePresence>
@@ -105,11 +124,21 @@ function App() {
                 variant="ghost"
                 onClick={handleClear}
                 className="w-10 h-10 p-0 rounded-full text-danger hover:bg-danger/10"
+                title="Close Image"
               >
                 <Trash2 size={20} />
               </Button>
 
               <div className="w-[1px] h-6 bg-white/20"></div>
+
+              <Button
+                variant="ghost"
+                onClick={handleOpenFile}
+                className="text-white hover:text-white/80"
+                title="Open Image"
+              >
+                <FolderOpen size={20} />
+              </Button>
 
               <Button
                 variant="ghost"
