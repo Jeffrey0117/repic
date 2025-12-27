@@ -8,9 +8,10 @@ import { Button } from './components/ui/Button';
 import { Crop, Trash2, Download, Camera, FolderOpen, ChevronLeft, ChevronRight } from 'lucide-react';
 import { captureScreen } from './utils/capture';
 import { useFileSystem } from './hooks/useFileSystem';
+import { TopBar } from './components/ui/TopBar';
 
 function App() {
-  const { currentImage, nextImage, prevImage, loadFolder, files, selectImage, currentIndex } = useFileSystem();
+  const { currentImage, nextImage, prevImage, loadFolder, files, selectImage, currentIndex, currentPath } = useFileSystem();
 
   // Local state for edits/UI
   const [localImage, setLocalImage] = useState(null);
@@ -176,6 +177,10 @@ function App() {
             exit={{ opacity: 0 }}
             className="absolute inset-0 flex flex-col items-center justify-center p-4 z-10"
           >
+            <TopBar
+              currentPath={currentPath}
+              onOpenFolder={handleOpenFile}
+            />
             <ImageViewer src={localImage} />
 
             {/* Gallery Navigation Arrows (Only if we have multiple files) */}

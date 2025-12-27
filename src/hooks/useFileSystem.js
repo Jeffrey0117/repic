@@ -75,6 +75,7 @@ export const useFileSystem = () => {
         loadFolder,
         nextImage,
         prevImage,
-        selectImage
+        selectImage,
+        currentPath
     };
 };
