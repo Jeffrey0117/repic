@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain, desktopCapturer } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, desktopCapturer, dialog } = require('electron');
 const path = require('path');
 
 let mainWindow;
@@ -23,7 +23,7 @@ function createWindow() {
     const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
     // Try multiple ports if default is busy, but for now hardcode or use arg
     const startUrl = isDev
-        ? 'http://localhost:5174'
+        ? 'http://localhost:5173'
         : `file://${path.join(__dirname, '../dist/index.html')}`;
 
     mainWindow.loadURL(startUrl);
@@ -49,6 +49,14 @@ ipcMain.handle('show-window', () => {
 ipcMain.handle('get-desktop-sources', async () => {
     const sources = await desktopCapturer.getSources({ types: ['screen'] });
     return sources; // Can't pass full objects properly sometimes, but basic info is fine
+});
+
+ipcMain.handle('select-directory', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+        properties: ['openDirectory']
+    });
+    if (result.canceled) return null;
+    return result.filePaths[0];
 });
 
 app.whenReady().then(() => {

@@ -45,9 +45,13 @@ function App() {
     setIsCapturing(false);
   };
 
-  const handleOpenFile = () => {
+  const handleOpenFile = async () => {
     if (window.require) {
-      document.getElementById('folder-upload-toolbar').click();
+      const { ipcRenderer } = window.require('electron');
+      const dir = await ipcRenderer.invoke('select-directory');
+      if (dir) {
+        loadFolder(dir);
+      }
     } else {
       document.getElementById('file-upload-toolbar').click();
     }
@@ -95,29 +99,6 @@ function App() {
               const reader = new FileReader();
               reader.onload = (ev) => handleImageUpload(ev.target.result);
               reader.readAsDataURL(file);
-            }
-          }
-        }}
-      />
-
-      {/* Folder Picker Input Habit */}
-      <input
-        type="file"
-        id="folder-upload-toolbar"
-        className="hidden"
-        ref={input => {
-          if (input) {
-            input.setAttribute('webkitdirectory', '');
-            input.setAttribute('directory', '');
-          }
-        }}
-        onChange={(e) => {
-          if (e.target.files && e.target.files.length > 0) {
-            const file = e.target.files[0];
-            if (file.path) {
-              const path = window.require('path');
-              const dir = path.dirname(file.path);
-              loadFolder(dir);
             }
           }
         }}
