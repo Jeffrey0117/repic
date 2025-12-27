@@ -60,6 +60,12 @@ export const useFileSystem = () => {
         setCurrentIndex(prev => (prev - 1 + files.length) % files.length);
     }, [files]);
 
+    const selectImage = useCallback((index) => {
+        if (index >= 0 && index < files.length) {
+            setCurrentIndex(index);
+        }
+    }, [files]);
+
     const currentImage = files[currentIndex] || null;
 
     return {
@@ -68,6 +74,7 @@ export const useFileSystem = () => {
         currentImage,
         loadFolder,
         nextImage,
-        prevImage
+        prevImage,
+        selectImage
     };
 };
