@@ -41,5 +41,15 @@ body {
   left: -7px;
 }
 
-/* Fix specific handle positions if needed, or rely on default absolute positioning */
-/* React-image-crop defaults are usually okay, but we make them round here */
+/* Hide scrollbar for Chrome, Safari and Opera */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+}
