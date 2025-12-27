@@ -71,8 +71,17 @@ function App() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="fixed bottom-12 left-1/2 -translate-x-1/2 z-10"
+              className="fixed bottom-12 left-1/2 -translate-x-1/2 z-10 flex gap-4"
             >
+              <Button
+                variant="ghost"
+                onClick={handleOpenFile}
+                className="bg-surface/50 hover:bg-surface border border-white/10 text-white px-6 py-3 rounded-full shadow-lg backdrop-blur-md"
+              >
+                <FolderOpen className="mr-2" size={20} />
+                Open File
+              </Button>
+
               <Button
                 variant="ghost"
                 onClick={handleScreenshot}
