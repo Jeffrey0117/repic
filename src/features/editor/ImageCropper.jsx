@@ -69,45 +69,33 @@ export const ImageCropper = ({ imageSrc, onCancel, onComplete }) => {
         <div className="flex flex-col h-full w-full bg-black select-none">
 
             {/* Cropper Container */}
-            <div className="relative flex-1 bg-black w-full h-full flex items-center justify-center overflow-hidden p-8">
-                <ReactCrop
-                    crop={crop}
-                    onChange={(_, percentCrop) => setCrop(percentCrop)}
-                    onComplete={(c) => setCompletedCrop(c)}
-                    className="max-h-full"
-                >
-                    <img
-                        ref={imgRef}
-                        src={imageSrc}
-                        alt="Crop me"
-                        onLoad={onImageLoad}
-                        style={{
-                            transform: `scale(${scale}) rotate(${rotate}deg)`,
-                            maxHeight: '75vh',
-                            maxWidth: '100%',
-                            objectFit: 'contain'
-                        }}
-                    />
-                </ReactCrop>
+            <div className="relative flex-1 bg-black w-full h-full flex items-center justify-center overflow-hidden p-4">
+                <div className="max-w-full max-h-full flex items-center justify-center">
+                    <ReactCrop
+                        crop={crop}
+                        onChange={(_, percentCrop) => setCrop(percentCrop)}
+                        onComplete={(c) => setCompletedCrop(c)}
+                        className="shadow-2xl"
+                    >
+                        <img
+                            ref={imgRef}
+                            src={imageSrc}
+                            alt="Crop me"
+                            onLoad={onImageLoad}
+                            style={{
+                                maxHeight: '80vh',
+                                maxWidth: '100%',
+                                display: 'block'
+                            }}
+                        />
+                    </ReactCrop>
+                </div>
             </div>
 
             {/* Controls Toolbar */}
             <div className="bg-surface/90 backdrop-blur-md pb-safe-area-bottom px-8 py-4 space-y-4 shadow-glass w-full border-t border-white/10 z-20">
 
-                <div className="flex items-center gap-6 max-w-md mx-auto">
-                    <span className="text-xs text-text-secondary font-medium uppercase tracking-wider w-10">Zoom</span>
-                    <Slider
-                        value={scale}
-                        min={0.5}
-                        max={3}
-                        step={0.1}
-                        onChange={setScale}
-                        className="flex-1"
-                    />
-                    <span className="text-xs text-text-secondary font-mono w-8 text-right">{Math.round(scale * 100)}%</span>
-                </div>
-
-                <div className="flex justify-between items-center pt-2 max-w-lg mx-auto w-full">
+                <div className="flex justify-between items-center max-w-lg mx-auto w-full pt-2">
                     <Button variant="text" onClick={onCancel} className="text-white/70 hover:text-white">
                         Cancel
                     </Button>

@@ -27,14 +27,15 @@ function App() {
   const [isEditing, setIsEditing] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
 
-  // Sync file system image with local view unless editing
+  // Sync file system image with local view only when currentImage actually changes
   useEffect(() => {
-    if (currentImage && !isEditing) {
+    if (currentImage) {
       setLocalImage(`file://${currentImage}`);
-    } else if (!currentImage && localImage && !isEditing) {
+      setIsEditing(false); // Reset editing when switching images
+    } else {
       setLocalImage(null);
     }
-  }, [currentImage, isEditing, localImage]);
+  }, [currentImage]); // Only depend on currentImage change
 
   const handleImageUpload = (imgSrc) => {
     setLocalImage(imgSrc);
