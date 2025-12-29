@@ -4,7 +4,7 @@ export default async function getCroppedImg(
     crop,
     rotate = 0,
     scale = 1,
-    fileName = 'cropped.jpg'
+    annotations = []
 ) {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -15,9 +15,6 @@ export default async function getCroppedImg(
 
     const scaleX = image.naturalWidth / image.width;
     const scaleY = image.naturalHeight / image.height;
-
-    // devicePixelRatio slightly increases sharpness on retina devices
-    // but let's stick to 1 for simplicity and performance unless requested
     const pixelRatio = 1;
 
     canvas.width = Math.floor(crop.width * scaleX * pixelRatio);
@@ -35,15 +32,15 @@ export default async function getCroppedImg(
 
     ctx.save();
 
-    // 5) Move the crop origin to the canvas origin (0,0)
+    // Move the crop origin to the canvas origin (0,0)
     ctx.translate(-cropX, -cropY);
-    // 4) Move the origin to the center of the original position
+    // Move the origin to the center of the original position
     ctx.translate(centerX, centerY);
-    // 3) Rotate around the origin
+    // Rotate around the origin
     ctx.rotate(rotateRads);
-    // 2) Scale the image
+    // Scale the image
     ctx.scale(scale, scale);
-    // 1) Move the center of the image to the origin (0,0)
+    // Move the center of the image to the origin (0,0)
     ctx.translate(-centerX, -centerY);
 
     ctx.drawImage(
@@ -57,6 +54,55 @@ export default async function getCroppedImg(
         image.naturalWidth,
         image.naturalHeight,
     );
+
+    // Render Annotations
+    annotations.forEach(ann => {
+        ctx.strokeStyle = '#0066FF';
+        ctx.lineWidth = 3 * scaleX; // Adjust stroke for natural resolution
+        ctx.lineCap = 'round';
+
+        // Convert UI coordinates to natural coordinates
+        const x = ann.x * scaleX;
+        const y = ann.y * scaleY;
+        const w = ann.width * scaleX;
+        const h = ann.height * scaleY;
+
+        switch (ann.type) {
+            case 'rect':
+                ctx.strokeRect(x, y, w, h);
+                break;
+            case 'circle':
+                ctx.beginPath();
+                ctx.ellipse(x + w / 2, y + h / 2, Math.abs(w / 2), Math.abs(h / 2), 0, 0, Math.PI * 2);
+                ctx.stroke();
+                break;
+            case 'arrow':
+                const headlen = 15 * scaleX;
+                const tox = x + w;
+                const toy = y + h;
+                const dx = tox - x;
+                const dy = toy - y;
+                const angle = Math.atan2(dy, dx);
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                ctx.lineTo(tox, toy);
+                ctx.lineTo(tox - headlen * Math.cos(angle - Math.PI / 6), toy - headlen * Math.sin(angle - Math.PI / 6));
+                ctx.moveTo(tox, toy);
+                ctx.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6), toy - headlen * Math.sin(angle + Math.PI / 6));
+                ctx.stroke();
+                break;
+            case 'blur':
+                // Simple blur implementation: draw a blurred version of the clipped area
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(x, y, w, h);
+                ctx.clip();
+                ctx.filter = 'blur(10px)';
+                ctx.drawImage(image, 0, 0, image.naturalWidth, image.naturalHeight);
+                ctx.restore();
+                break;
+        }
+    });
 
     ctx.restore();
 

@@ -11,6 +11,7 @@ export const useFileSystem = () => {
     const [currentIndex, setCurrentIndex] = useState(-1);
     const [currentPath, setCurrentPath] = useState(null);
     const [currentMetadata, setCurrentMetadata] = useState(null);
+    const [thumbCache, setThumbCache] = useState({}); // Simple memory cache
 
     // Initial Load - Desktop
     useEffect(() => {
@@ -44,12 +45,23 @@ export const useFileSystem = () => {
                 setFiles(imageFiles);
                 setCurrentIndex(0);
                 setCurrentPath(folderPath); // Track current folder
+
+                // Prefetch thumbnails (limited set for performance)
+                imageFiles.slice(0, 30).forEach(file => {
+                    if (!thumbCache[file]) {
+                        const img = new Image();
+                        img.onload = () => {
+                            setThumbCache(prev => ({ ...prev, [file]: img.src }));
+                        };
+                        img.src = `file://${file}`;
+                    }
+                });
             } else {
                 setFiles([]);
                 setCurrentIndex(-1);
             }
         });
-    }, []);
+    }, [thumbCache]);
 
     const nextImage = useCallback(() => {
         if (files.length === 0) return null;
