@@ -74,6 +74,27 @@ ipcMain.handle('get-file-info', async (event, filePath) => {
     }
 });
 
+ipcMain.handle('save-file', async (event, { filePath, base64Data }) => {
+    try {
+        const buffer = Buffer.from(base64Data.split(',')[1], 'base64');
+        fs.writeFileSync(filePath, buffer);
+        return { success: true };
+    } catch (e) {
+        console.error("Failed to save file", e);
+        return { success: false, error: e.message };
+    }
+});
+
+ipcMain.handle('show-save-dialog', async (event, defaultPath) => {
+    const result = await dialog.showSaveDialog(mainWindow, {
+        defaultPath,
+        filters: [
+            { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }
+        ]
+    });
+    return result;
+});
+
 app.whenReady().then(() => {
     createWindow();
 

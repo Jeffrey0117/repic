@@ -6,6 +6,7 @@ import { ImageCropper } from './features/editor/ImageCropper';
 import { Sidebar } from './components/ui/Sidebar';
 import { InfoPanel } from './components/ui/InfoPanel';
 import { TopBar } from './components/ui/TopBar';
+import { SaveToolbar } from './components/ui/SaveToolbar';
 import { captureScreen } from './utils/capture';
 import { useFileSystem } from './hooks/useFileSystem';
 
@@ -26,14 +27,18 @@ function App() {
   const [localImage, setLocalImage] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [showInfoPanel, setShowInfoPanel] = useState(true);
+  const [isModified, setIsModified] = useState(false);
 
   // Sync file system image with local view only when currentImage actually changes
   useEffect(() => {
     if (currentImage) {
       setLocalImage(`file://${currentImage}`);
       setIsEditing(false); // Reset editing when switching images
+      setIsModified(false); // Reset modified state
     } else {
       setLocalImage(null);
+      setIsModified(false);
     }
   }, [currentImage]); // Only depend on currentImage change
 
@@ -65,6 +70,69 @@ function App() {
   const handleCropComplete = (croppedImg) => {
     setLocalImage(croppedImg);
     setIsEditing(false);
+    setIsModified(true); // Mark as modified after crop
+  };
+
+  const handleSaveReplace = async () => {
+    if (!currentImage || !localImage.startsWith('data:')) return;
+
+    const { ipcRenderer } = window.require('electron');
+    const result = await ipcRenderer.invoke('save-file', {
+      filePath: currentImage,
+      base64Data: localImage
+    });
+
+    if (result.success) {
+      // Reload the image to update viewer/sidebar
+      const originalPath = currentImage;
+      setLocalImage(`file://${originalPath}?t=${Date.now()}`);
+      setIsModified(false);
+    } else {
+      alert("Failed to save: " + result.error);
+    }
+  };
+
+  const handleSaveAs = async () => {
+    if (!localImage.startsWith('data:')) return;
+
+    const { ipcRenderer } = window.require('electron');
+    const path = window.require('path');
+
+    let defaultName = `repic-${Date.now()}.png`;
+    if (currentImage) {
+      const ext = path.extname(currentImage);
+      const base = path.basename(currentImage, ext);
+      defaultName = `${base}-cropped${ext}`;
+    }
+
+    const defaultPath = currentPath ? path.join(currentPath, defaultName) : defaultName;
+
+    const { canceled, filePath } = await ipcRenderer.invoke('show-save-dialog', defaultPath);
+
+    if (!canceled && filePath) {
+      const result = await ipcRenderer.invoke('save-file', {
+        filePath,
+        base64Data: localImage
+      });
+
+      if (result.success) {
+        setIsModified(false);
+        if (currentPath) loadFolder(currentPath); // Refresh folder if applicable
+      } else {
+        alert("Failed to save: " + result.error);
+      }
+    }
+  };
+
+  const handleDiscard = () => {
+    if (confirm("Discard changes?")) {
+      if (currentImage) {
+        setLocalImage(`file://${currentImage}`);
+      } else {
+        setLocalImage(null);
+      }
+      setIsModified(false);
+    }
   };
 
   const handleClear = () => {
@@ -103,6 +171,8 @@ function App() {
         onEdit={() => setIsEditing(true)}
         onClear={handleClear}
         onSave={handleSave}
+        showInfoPanel={showInfoPanel}
+        onToggleInfo={() => setShowInfoPanel(!showInfoPanel)}
       />
 
       {/* 2. Main Content Area */}
@@ -153,9 +223,25 @@ function App() {
         </main>
 
         {/* Right: Info Panel */}
-        <InfoPanel metadata={currentMetadata} />
+        <AnimatePresence>
+          {showInfoPanel && (
+            <InfoPanel metadata={currentMetadata} />
+          )}
+        </AnimatePresence>
 
       </div>
+
+      {/* Post-Crop Save Toolbar */}
+      <AnimatePresence>
+        {isModified && (
+          <SaveToolbar
+            isLocalFile={!!currentImage}
+            onSaveReplace={handleSaveReplace}
+            onSaveAs={handleSaveAs}
+            onDiscard={handleDiscard}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Capture Overlay */}
       {isCapturing && (

@@ -10,11 +10,12 @@ import {
     Settings,
     Maximize,
     Download,
-    Camera
+    Camera,
+    Info
 } from 'lucide-react';
 import { Button } from './Button';
 
-export const TopBar = ({ currentPath, onOpenFolder, onScreenshot, onEdit, onClear, onSave }) => {
+export const TopBar = ({ currentPath, onOpenFolder, onScreenshot, onEdit, onClear, onSave, showInfoPanel, onToggleInfo }) => {
     const folderName = currentPath
         ? (window.require ? window.require('path').basename(currentPath) : currentPath)
         : "Open Folder";
@@ -49,6 +50,14 @@ export const TopBar = ({ currentPath, onOpenFolder, onScreenshot, onEdit, onClea
 
             {/* Right: Actions */}
             <div className="flex items-center gap-2">
+                <Button
+                    variant="ghost"
+                    className={`h-9 w-9 p-0 rounded-lg transition-all ${showInfoPanel ? 'bg-primary/20 text-primary' : 'hover:bg-white/5 text-white/70'}`}
+                    onClick={onToggleInfo}
+                    title="Toggle Info Panel"
+                >
+                    <Info size={18} />
+                </Button>
                 <Button variant="ghost" className="h-9 w-9 p-0 rounded-lg hover:bg-white/5" onClick={onSave}>
                     <Download size={18} className="text-white/70 hover:text-primary transition-colors" />
                 </Button>
