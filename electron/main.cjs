@@ -111,6 +111,7 @@ function setupIpcHandlers() {
 
     // Batch crop - save cropped image data to file
     ipcMain.handle('batch-crop-save', async (event, { filePath, base64Data, outputMode, originalPath, customDir }) => {
+        console.log('[batch-crop-save] Received:', { filePath, outputMode, originalPath, customDir, hasBase64: !!base64Data });
         try {
             let targetPath = filePath;
 
@@ -130,11 +131,13 @@ function setupIpcHandlers() {
                 targetPath = path.join(croppedDir, path.basename(originalPath));
             }
 
+            console.log('[batch-crop-save] Writing to:', targetPath);
             const buffer = Buffer.from(base64Data.split(',')[1], 'base64');
             fs.writeFileSync(targetPath, buffer);
+            console.log('[batch-crop-save] Success!');
             return { success: true, path: targetPath };
         } catch (e) {
-            console.error("Batch crop save failed", e);
+            console.error("[batch-crop-save] Failed:", e.message);
             return { success: false, error: e.message };
         }
     });

@@ -188,6 +188,7 @@ function App() {
 
         const base64Data = canvas.toDataURL('image/png');
 
+        console.log('Sending batch-crop-save:', { filePath, outputMode, customDir });
         const result = await ipcRenderer.invoke('batch-crop-save', {
           filePath,
           base64Data,
@@ -195,16 +196,17 @@ function App() {
           originalPath: filePath,
           customDir
         });
+        console.log('batch-crop-save result:', result);
 
-        if (result.success) {
+        if (result && result.success) {
           successCount++;
         } else {
           failCount++;
-          console.error(`Failed to save ${filePath}:`, result.error);
+          console.error(`Failed to save ${filePath}:`, result?.error || 'Unknown error');
         }
       } catch (e) {
         failCount++;
-        console.error(`Failed to crop ${filePath}:`, e);
+        console.error(`Failed to crop ${filePath}:`, e.message, e);
       }
     }
 
