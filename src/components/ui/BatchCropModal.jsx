@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, FolderOutput, Replace, Loader2, Check, FolderOpen } from 'lucide-react';
 import { Button } from './Button';
+import useI18n from '../../hooks/useI18n';
 
 export const BatchCropModal = ({
     isOpen,
@@ -11,6 +12,7 @@ export const BatchCropModal = ({
     crop,
     onConfirm
 }) => {
+    const { t } = useI18n();
     const [selectedFiles, setSelectedFiles] = useState(new Set());
     const [outputMode, setOutputMode] = useState('replace');
     const [customDir, setCustomDir] = useState(null);
@@ -109,15 +111,15 @@ export const BatchCropModal = ({
                     {/* Crop Info */}
                     <div className="bg-white/5 rounded-xl p-3 mb-4 flex items-center justify-between">
                         <div>
-                            <div className="text-xs text-white/40">Crop Region</div>
+                            <div className="text-xs text-white/40">{t("cropRegion")}</div>
                             <div className="text-sm font-medium text-white">
                                 {Math.round(crop?.width || 0)}% × {Math.round(crop?.height || 0)}%
                             </div>
                         </div>
                         <div className="text-right">
-                            <div className="text-xs text-white/40">Selected</div>
+                            <div className="text-xs text-white/40">{t("selected")}</div>
                             <div className="text-sm font-bold text-primary">
-                                {selectedFiles.size} images
+                                {selectedFiles.size} {t('images')}
                             </div>
                         </div>
                     </div>
@@ -217,7 +219,7 @@ export const BatchCropModal = ({
                                         className="sr-only"
                                     />
                                     <Replace size={16} className={outputMode === 'replace' ? 'text-primary' : 'text-white/40'} />
-                                    <span className="text-sm text-white">覆蓋原檔</span>
+                                    <span className="text-sm text-white">{t('replaceOriginal')}</span>
                                 </label>
 
                                 <label
@@ -236,7 +238,7 @@ export const BatchCropModal = ({
                                         className="sr-only"
                                     />
                                     <FolderOutput size={16} className={outputMode === 'folder' ? 'text-primary' : 'text-white/40'} />
-                                    <span className="text-sm text-white">cropped 資料夾</span>
+                                    <span className="text-sm text-white">{t('croppedFolder')}</span>
                                 </label>
                             </div>
 
@@ -251,7 +253,7 @@ export const BatchCropModal = ({
                             >
                                 <FolderOpen size={16} className={outputMode === 'custom' ? 'text-primary' : 'text-white/40'} />
                                 <span className="text-sm text-white">
-                                    {customDir ? `另存到: ${path?.basename(customDir)}` : '選擇資料夾...'}
+                                    {customDir ? t('saveTo', { folder: path?.basename(customDir) }) : t('selectDirectory')}
                                 </span>
                             </button>
                         </div>
@@ -263,7 +265,7 @@ export const BatchCropModal = ({
                             <div className="flex items-center gap-2 mb-3">
                                 <Loader2 size={16} className="text-primary animate-spin" />
                                 <span className="text-sm text-white">
-                                    Processing {progress.current} / {progress.total}
+                                    {t('processing')} {progress.current} / {progress.total}
                                 </span>
                             </div>
                             <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
@@ -292,7 +294,7 @@ export const BatchCropModal = ({
                             disabled={isProcessing || selectedFiles.size === 0}
                             className="flex-1"
                         >
-                            {isProcessing ? 'Processing...' : `Crop ${selectedFiles.size} Images`}
+                            {isProcessing ? t('processing') : t('cropImages', { count: selectedFiles.size })}
                         </Button>
                     </div>
                 </motion.div>

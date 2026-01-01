@@ -1,12 +1,15 @@
 import { motion } from 'framer-motion';
 import { Info, BarChart3, Database, Calendar } from 'lucide-react';
+import useI18n from '../../hooks/useI18n';
 
 export const InfoPanel = ({ metadata }) => {
+    const { t, language } = useI18n();
+
     if (!metadata) return null;
 
     const formatDate = (date) => {
-        if (!date) return 'Unknown';
-        return new Date(date).toLocaleString();
+        if (!date) return t('unknown');
+        return new Date(date).toLocaleString(language === 'zh-TW' ? 'zh-TW' : 'en-US');
     };
 
     const formatSize = (bytes) => {
@@ -25,32 +28,32 @@ export const InfoPanel = ({ metadata }) => {
         >
             <div className="flex items-center gap-2 mb-8 border-b border-white/5 pb-4">
                 <Info size={18} className="text-primary" />
-                <h2 className="text-sm font-semibold text-white tracking-wider uppercase">Details</h2>
+                <h2 className="text-sm font-semibold text-white tracking-wider uppercase">{t('details')}</h2>
             </div>
 
             <div className="space-y-8 overflow-y-auto no-scrollbar pr-2">
                 {/* Info Rows */}
                 <InfoItem
                     icon={<BarChart3 size={16} />}
-                    label="Image Resolution"
+                    label={t('imageResolution')}
                     value={`${metadata.width} x ${metadata.height}`}
                 />
 
                 <InfoItem
                     icon={<Database size={16} />}
-                    label="File Size"
+                    label={t('fileSize')}
                     value={formatSize(metadata.size)}
                 />
 
                 <InfoItem
                     icon={<Calendar size={16} />}
-                    label="Created Date"
+                    label={t('createdDate')}
                     value={formatDate(metadata.birthtime)}
                 />
 
                 <InfoItem
                     icon={<Calendar size={16} />}
-                    label="Modified Date"
+                    label={t('modifiedDate')}
                     value={formatDate(metadata.mtime)}
                 />
             </div>

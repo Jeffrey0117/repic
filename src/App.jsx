@@ -10,8 +10,10 @@ import { SaveToolbar } from './components/ui/SaveToolbar';
 import { BatchCropModal } from './components/ui/BatchCropModal';
 import { captureScreen } from './utils/capture';
 import { useFileSystem } from './hooks/useFileSystem';
+import useI18n from './hooks/useI18n';
 
 function App() {
+  const { t } = useI18n();
   const {
     currentImage,
     nextImage,
@@ -93,7 +95,7 @@ function App() {
       setLocalImage(`file://${originalPath}?t=${Date.now()}`);
       setIsModified(false);
     } else {
-      alert("Failed to save: " + result.error);
+      alert(t("failedToSave", { error: result.error }));
     }
   };
 
@@ -124,13 +126,13 @@ function App() {
         setIsModified(false);
         if (currentPath) loadFolder(currentPath); // Refresh folder if applicable
       } else {
-        alert("Failed to save: " + result.error);
+        alert(t("failedToSave", { error: result.error }));
       }
     }
   };
 
   const handleDiscard = () => {
-    if (confirm("Discard changes?")) {
+    if (confirm(t("discardChanges"))) {
       if (currentImage) {
         setLocalImage(`file://${currentImage}`);
       } else {
@@ -215,7 +217,7 @@ function App() {
 
     // Show result feedback
     if (failCount > 0) {
-      alert(`完成！成功 ${successCount} 張，失敗 ${failCount} 張`);
+      alert(t('completedMessage', { success: successCount, failed: failCount }));
     }
 
     // Refresh folder after batch complete
@@ -226,7 +228,7 @@ function App() {
   };
 
   const handleClear = () => {
-    if (confirm("Close image?")) {
+    if (confirm(t("closeImage"))) {
       setLocalImage(null);
       setIsEditing(false);
     }
@@ -307,7 +309,7 @@ function App() {
               <div className="w-full h-full flex flex-col items-center justify-center opacity-40">
                 <Dropzone onImageUpload={handleImageUpload} />
                 <div className="mt-8 text-sm tracking-widest uppercase animate-pulse">
-                  Select a folder to begin
+                  {t("selectFolder")}
                 </div>
               </div>
             )}
@@ -338,7 +340,7 @@ function App() {
       {/* Capture Overlay */}
       {isCapturing && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center">
-          <div className="text-xl font-light tracking-[0.5em] animate-pulse">CAPTURING...</div>
+          <div className="text-xl font-light tracking-[0.5em] animate-pulse">{t("capturing")}</div>
         </div>
       )}
 

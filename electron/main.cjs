@@ -12,6 +12,7 @@ function createWindow() {
         minHeight: 600,
         backgroundColor: '#000000',
         titleBarStyle: 'hiddenInset',
+        icon: path.join(__dirname, '../repic-logo.png'),
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,

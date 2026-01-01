@@ -6,6 +6,7 @@ import { Slider } from '../../components/ui/Slider';
 import getCroppedImg from './utils/canvasUtils';
 import { AnnotationLayer } from './AnnotationLayer';
 import { Layers } from 'lucide-react';
+import useI18n from '../../hooks/useI18n';
 
 // Helper to center the crop initially
 function centerAspectCrop(mediaWidth, mediaHeight, aspect) {
@@ -25,6 +26,7 @@ function centerAspectCrop(mediaWidth, mediaHeight, aspect) {
 }
 
 export const ImageCropper = ({ imageSrc, onCancel, onComplete, fileCount = 1, onApplyToAll }) => {
+    const { t } = useI18n();
     const [crop, setCrop] = useState();
     const [completedCrop, setCompletedCrop] = useState(null);
     const [scale, setScale] = useState(1);
@@ -34,18 +36,14 @@ export const ImageCropper = ({ imageSrc, onCancel, onComplete, fileCount = 1, on
     const imgRef = useRef(null);
 
     const onImageLoad = (e) => {
-        const { width, height } = e.currentTarget;
-        const initialCrop = centerCrop(
-            {
-                unit: '%',
-                width: 80,
-                height: 80,
-                x: 10,
-                y: 10
-            },
-            width,
-            height
-        );
+        // Set initial crop to cover 100% of the image per SPEC-001
+        const initialCrop = {
+            unit: '%',
+            width: 100,
+            height: 100,
+            x: 0,
+            y: 0
+        };
         setCrop(initialCrop);
     };
 
@@ -69,11 +67,11 @@ export const ImageCropper = ({ imageSrc, onCancel, onComplete, fileCount = 1, on
     };
 
     const tools = [
-        { id: null, label: 'Crop', icon: 'Crop' },  // null = crop mode
-        { id: 'rect', label: 'Box', icon: 'Square' },
-        { id: 'circle', label: 'Circle', icon: 'Circle' },
-        { id: 'arrow', label: 'Arrow', icon: 'ArrowUpRight' },
-        { id: 'blur', label: 'Blur', icon: 'Ghost' },
+        { id: null, label: t('crop'), icon: 'Crop' },  // null = crop mode
+        { id: 'rect', label: t('box'), icon: 'Square' },
+        { id: 'circle', label: t('circle'), icon: 'Circle' },
+        { id: 'arrow', label: t('arrow'), icon: 'ArrowUpRight' },
+        { id: 'blur', label: t('blur'), icon: 'Ghost' },
     ];
 
     return (
@@ -130,12 +128,12 @@ export const ImageCropper = ({ imageSrc, onCancel, onComplete, fileCount = 1, on
 
                 <div className="flex justify-between items-center max-w-2xl mx-auto w-full pt-2">
                     <Button variant="text" onClick={onCancel} className="text-white/70 hover:text-white">
-                        Cancel
+                        {t('cancel')}
                     </Button>
 
                     <div className="flex items-center gap-4">
                         <span className="text-sm font-semibold text-white tracking-wide">
-                            {activeTool ? `Draw ${activeTool}` : 'Crop Mode'}
+                            {activeTool ? t('draw', { tool: activeTool }) : t('cropMode')}
                         </span>
 
                         {/* Apply to Others - only show when multiple files */}
@@ -145,13 +143,13 @@ export const ImageCropper = ({ imageSrc, onCancel, onComplete, fileCount = 1, on
                                 className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded-lg text-xs font-medium transition-all border border-amber-500/30"
                             >
                                 <Layers size={14} />
-                                Apply to Others
+                                {t('applyToOthers')}
                             </button>
                         )}
                     </div>
 
                     <Button variant="text" onClick={handleSave} className="text-primary hover:text-blue-400 font-bold">
-                        Done
+                        {t('done')}
                     </Button>
                 </div>
             </div>
