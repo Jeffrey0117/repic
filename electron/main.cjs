@@ -108,6 +108,36 @@ function setupIpcHandlers() {
         });
         return result;
     });
+
+    // Batch crop - save cropped image data to file
+    ipcMain.handle('batch-crop-save', async (event, { filePath, base64Data, outputMode, originalPath, customDir }) => {
+        try {
+            let targetPath = filePath;
+
+            if (outputMode === 'custom' && customDir) {
+                // Save to user-selected directory
+                if (!fs.existsSync(customDir)) {
+                    fs.mkdirSync(customDir, { recursive: true });
+                }
+                targetPath = path.join(customDir, path.basename(originalPath));
+            } else if (outputMode === 'folder') {
+                // Create "cropped" subfolder
+                const dir = path.dirname(originalPath);
+                const croppedDir = path.join(dir, 'cropped');
+                if (!fs.existsSync(croppedDir)) {
+                    fs.mkdirSync(croppedDir, { recursive: true });
+                }
+                targetPath = path.join(croppedDir, path.basename(originalPath));
+            }
+
+            const buffer = Buffer.from(base64Data.split(',')[1], 'base64');
+            fs.writeFileSync(targetPath, buffer);
+            return { success: true, path: targetPath };
+        } catch (e) {
+            console.error("Batch crop save failed", e);
+            return { success: false, error: e.message };
+        }
+    });
 }
 
 app.whenReady().then(() => {

@@ -7,6 +7,7 @@ import { Sidebar } from './components/ui/Sidebar';
 import { InfoPanel } from './components/ui/InfoPanel';
 import { TopBar } from './components/ui/TopBar';
 import { SaveToolbar } from './components/ui/SaveToolbar';
+import { BatchCropModal } from './components/ui/BatchCropModal';
 import { captureScreen } from './utils/capture';
 import { useFileSystem } from './hooks/useFileSystem';
 
@@ -29,6 +30,10 @@ function App() {
   const [isCapturing, setIsCapturing] = useState(false);
   const [showInfoPanel, setShowInfoPanel] = useState(true);
   const [isModified, setIsModified] = useState(false);
+
+  // Batch crop state
+  const [showBatchModal, setShowBatchModal] = useState(false);
+  const [batchCrop, setBatchCrop] = useState(null);
 
   // Sync file system image with local view only when currentImage actually changes
   useEffect(() => {
@@ -135,6 +140,86 @@ function App() {
     }
   };
 
+  // Batch crop handlers
+  const handleApplyToAll = (crop) => {
+    setBatchCrop(crop);
+    setShowBatchModal(true);
+  };
+
+  const handleBatchCropConfirm = async (selectedIndexes, outputMode, customDir, onProgress) => {
+    if (!batchCrop || !selectedIndexes.length) return;
+
+    const { ipcRenderer } = window.require('electron');
+    let successCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < selectedIndexes.length; i++) {
+      const filePath = files[selectedIndexes[i]];
+      onProgress(i + 1);
+
+      try {
+        // Load image
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+          img.src = `file://${filePath}`;
+        });
+
+        // Create canvas and crop
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Calculate pixel crop from percentage
+        const cropX = (batchCrop.x / 100) * img.naturalWidth;
+        const cropY = (batchCrop.y / 100) * img.naturalHeight;
+        const cropWidth = (batchCrop.width / 100) * img.naturalWidth;
+        const cropHeight = (batchCrop.height / 100) * img.naturalHeight;
+
+        canvas.width = cropWidth;
+        canvas.height = cropHeight;
+
+        ctx.drawImage(
+          img,
+          cropX, cropY, cropWidth, cropHeight,
+          0, 0, cropWidth, cropHeight
+        );
+
+        const base64Data = canvas.toDataURL('image/png');
+
+        const result = await ipcRenderer.invoke('batch-crop-save', {
+          filePath,
+          base64Data,
+          outputMode,
+          originalPath: filePath,
+          customDir
+        });
+
+        if (result.success) {
+          successCount++;
+        } else {
+          failCount++;
+          console.error(`Failed to save ${filePath}:`, result.error);
+        }
+      } catch (e) {
+        failCount++;
+        console.error(`Failed to crop ${filePath}:`, e);
+      }
+    }
+
+    // Show result feedback
+    if (failCount > 0) {
+      alert(`完成！成功 ${successCount} 張，失敗 ${failCount} 張`);
+    }
+
+    // Refresh folder after batch complete
+    if (currentPath) {
+      loadFolder(currentPath);
+    }
+    setIsEditing(false);
+  };
+
   const handleClear = () => {
     if (confirm("Close image?")) {
       setLocalImage(null);
@@ -200,6 +285,8 @@ function App() {
                   imageSrc={localImage}
                   onCancel={() => setIsEditing(false)}
                   onComplete={handleCropComplete}
+                  fileCount={files.length}
+                  onApplyToAll={handleApplyToAll}
                 />
               </motion.div>
             ) : localImage ? (
@@ -249,6 +336,16 @@ function App() {
           <div className="text-xl font-light tracking-[0.5em] animate-pulse">CAPTURING...</div>
         </div>
       )}
+
+      {/* Batch Crop Modal */}
+      <BatchCropModal
+        isOpen={showBatchModal}
+        onClose={() => setShowBatchModal(false)}
+        files={files}
+        currentIndex={currentIndex}
+        crop={batchCrop}
+        onConfirm={handleBatchCropConfirm}
+      />
 
     </div>
   );

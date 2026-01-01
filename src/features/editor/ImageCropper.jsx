@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { Slider } from '../../components/ui/Slider';
 import getCroppedImg from './utils/canvasUtils';
 import { AnnotationLayer } from './AnnotationLayer';
+import { Layers } from 'lucide-react';
 
 // Helper to center the crop initially
 function centerAspectCrop(mediaWidth, mediaHeight, aspect) {
@@ -23,7 +24,7 @@ function centerAspectCrop(mediaWidth, mediaHeight, aspect) {
     )
 }
 
-export const ImageCropper = ({ imageSrc, onCancel, onComplete }) => {
+export const ImageCropper = ({ imageSrc, onCancel, onComplete, fileCount = 1, onApplyToAll }) => {
     const [crop, setCrop] = useState();
     const [completedCrop, setCompletedCrop] = useState(null);
     const [scale, setScale] = useState(1);
@@ -127,13 +128,28 @@ export const ImageCropper = ({ imageSrc, onCancel, onComplete }) => {
                     ))}
                 </div>
 
-                <div className="flex justify-between items-center max-w-lg mx-auto w-full pt-2">
+                <div className="flex justify-between items-center max-w-2xl mx-auto w-full pt-2">
                     <Button variant="text" onClick={onCancel} className="text-white/70 hover:text-white">
                         Cancel
                     </Button>
-                    <span className="text-sm font-semibold text-white tracking-wide">
-                        {activeTool ? `Draw ${activeTool}` : 'Crop Mode'}
-                    </span>
+
+                    <div className="flex items-center gap-4">
+                        <span className="text-sm font-semibold text-white tracking-wide">
+                            {activeTool ? `Draw ${activeTool}` : 'Crop Mode'}
+                        </span>
+
+                        {/* Apply to Others - only show when multiple files */}
+                        {fileCount > 1 && crop && (
+                            <button
+                                onClick={() => onApplyToAll?.(crop)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded-lg text-xs font-medium transition-all border border-amber-500/30"
+                            >
+                                <Layers size={14} />
+                                Apply to Others
+                            </button>
+                        )}
+                    </div>
+
                     <Button variant="text" onClick={handleSave} className="text-primary hover:text-blue-400 font-bold">
                         Done
                     </Button>
