@@ -10,6 +10,7 @@
   "replace": "覆蓋原檔",
   "newFolder": "新資料夾",
   "selectFolder": "請選擇資料夾以開始",
+  "selectFolderHint": "選擇包含圖片的資料夾以開始使用",
   "confirm": "確認",
   "cancel": "取消",
   "selectAll": "全選",

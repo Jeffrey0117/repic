@@ -57,11 +57,6 @@ function App() {
     }
   }, [currentImage, cacheVersion]); // Also depend on cacheVersion for refresh after save
 
-  const handleImageUpload = (imgSrc) => {
-    setLocalImage(imgSrc);
-    setIsEditing(false);
-  };
-
   const handleOpenFile = async () => {
     const electronAPI = getElectronAPI();
     if (electronAPI) {
@@ -338,10 +333,7 @@ function App() {
                 exit={{ opacity: 0 }}
                 className="absolute inset-4 flex flex-col items-center justify-center"
               >
-                <Dropzone onImageUpload={handleImageUpload} onOpenFolder={handleOpenFile} />
-                <div className="mt-8 text-sm tracking-widest uppercase animate-pulse">
-                  {t("selectFolder")}
-                </div>
+                <Dropzone onOpenFolder={handleOpenFile} />
               </motion.div>
             ) : null}
           </AnimatePresence>

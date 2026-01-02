@@ -10,6 +10,7 @@
   "replace": "Replace",
   "newFolder": "New Folder",
   "selectFolder": "Select a folder to begin",
+  "selectFolderHint": "Select a folder containing images to get started",
   "confirm": "Confirm",
   "cancel": "Cancel",
   "selectAll": "Select All",
