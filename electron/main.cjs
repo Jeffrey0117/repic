@@ -31,6 +31,7 @@ function createWindow() {
             preload: path.join(__dirname, 'preload.cjs'),
             nodeIntegration: false,
             contextIsolation: true,
+            sandbox: false, // Allow Node.js modules in preload script
             webSecurity: false // Keep false for local file access (file:// protocol)
         }
     });
@@ -48,6 +49,10 @@ function createWindow() {
     // Show window when ready to avoid white flash
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
+        // Open DevTools in dev mode for debugging
+        if (!app.isPackaged) {
+            mainWindow.webContents.openDevTools();
+        }
     });
 }
 
