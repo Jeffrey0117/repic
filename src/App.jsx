@@ -319,13 +319,8 @@ function App() {
         onToggleInfo={() => setShowInfoPanel(!showInfoPanel)}
       />
 
-      {/* 2. Main Content Area - using CSS Grid for smooth InfoPanel toggle */}
-      <div
-        className="flex-1 overflow-hidden grid transition-all duration-300 ease-out"
-        style={{
-          gridTemplateColumns: `auto 1fr ${showInfoPanel && !isEditing ? '280px' : '0px'}`
-        }}
-      >
+      {/* 2. Main Content Area */}
+      <div className="flex-1 overflow-hidden flex">
 
         {/* Left: Thumbnail Explorer */}
         <Sidebar
@@ -389,10 +384,11 @@ function App() {
         </main>
 
         {/* Right: Info Panel - hidden during editing */}
-        <InfoPanel
-          metadata={currentMetadata}
-          isVisible={showInfoPanel && !isEditing}
-        />
+        <AnimatePresence>
+          {showInfoPanel && !isEditing && (
+            <InfoPanel metadata={currentMetadata} />
+          )}
+        </AnimatePresence>
 
       </div>
 

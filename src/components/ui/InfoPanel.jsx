@@ -1,8 +1,9 @@
 import { memo } from 'react';
+import { motion } from '../../lib/motion';
 import { Info, BarChart3, Database, Calendar } from '../icons';
 import useI18n from '../../hooks/useI18n';
 
-export const InfoPanel = memo(function InfoPanel({ metadata, isVisible = true }) {
+export const InfoPanel = memo(function InfoPanel({ metadata }) {
     const { t, language } = useI18n();
 
     const formatDate = (date) => {
@@ -19,21 +20,11 @@ export const InfoPanel = memo(function InfoPanel({ metadata, isVisible = true })
     };
 
     return (
-        <div
-            className={`
-                h-full bg-surface/30 backdrop-blur-xl border-l border-white/5
-                flex flex-col
-                transition-all duration-300 ease-out
-                ${isVisible ? 'opacity-100 p-6 w-70' : 'opacity-0 p-0 w-0'}
-            `}
-            style={{
-                // Prevent content from overflowing when width is 0
-                overflow: 'hidden',
-                // Prevent flex shrink to maintain width
-                flexShrink: 0,
-                // Content visibility helps with performance when hidden
-                contentVisibility: isVisible ? 'visible' : 'hidden'
-            }}
+        <motion.div
+            initial={{ x: 300, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: 300, opacity: 0 }}
+            className="w-[280px] h-full bg-surface/30 backdrop-blur-xl border-l border-white/5 flex flex-col overflow-hidden p-6 shrink-0"
         >
             {metadata ? (
                 <>
@@ -78,7 +69,7 @@ export const InfoPanel = memo(function InfoPanel({ metadata, isVisible = true })
                     {t('noImageSelected') || 'No image selected'}
                 </div>
             )}
-        </div>
+        </motion.div>
     );
 });
 
