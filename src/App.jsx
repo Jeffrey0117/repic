@@ -6,6 +6,7 @@ import { Sidebar } from './components/ui/Sidebar';
 import { InfoPanel } from './components/ui/InfoPanel';
 import { TopBar } from './components/ui/TopBar';
 import { SaveToolbar } from './components/ui/SaveToolbar';
+import { Toast } from './components/ui/Toast';
 import { captureScreen } from './utils/capture';
 import { useFileSystem } from './hooks/useFileSystem';
 import useI18n from './hooks/useI18n';
@@ -42,6 +43,9 @@ function App() {
   // Batch crop state
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [batchCrop, setBatchCrop] = useState(null);
+
+  // Toast state
+  const [toast, setToast] = useState({ visible: false, message: '' });
 
   // Sync file system image with local view only when currentImage or cacheVersion changes
   useEffect(() => {
@@ -84,6 +88,7 @@ function App() {
     setLocalImage(croppedImg);
     setIsEditing(false);
     setIsModified(true); // Mark as modified after crop
+    // Toast will show after save, not after crop
   };
 
   const handleSaveReplace = async () => {
@@ -110,6 +115,7 @@ function App() {
       const timestamp = Date.now();
       setLocalImage(`file://${originalPath}?t=${timestamp}`);
       setIsModified(false);
+      setToast({ visible: true, message: t('saveSuccess') });
 
       // Refresh folder to update sidebar thumbnails (preserve current position)
       if (currentPath) {
@@ -141,6 +147,7 @@ function App() {
 
       if (result.success) {
         setIsModified(false);
+        setToast({ visible: true, message: t('saveSuccess') });
         if (currentPath) loadFolder(currentPath); // Refresh folder if applicable
       } else {
         alert(t("failedToSave", { error: result.error }));
@@ -167,8 +174,21 @@ function App() {
 
   const handleBatchCropConfirm = async (selectedIndexes, outputMode, customDir, onProgress) => {
     const electronAPI = getElectronAPI();
-    if (!batchCrop) return;
-    if (!electronAPI) return;
+    if (!batchCrop) {
+      console.error('[handleBatchCropConfirm] No batchCrop defined');
+      return;
+    }
+    if (!electronAPI) {
+      console.error('[handleBatchCropConfirm] No electronAPI');
+      return;
+    }
+
+    console.log('[handleBatchCropConfirm] Starting batch crop', {
+      batchCrop,
+      selectedIndexes,
+      outputMode,
+      currentIndex
+    });
 
     let successCount = 0;
     let failCount = 0;
@@ -178,16 +198,21 @@ function App() {
 
     for (let i = 0; i < allIndexes.length; i++) {
       const filePath = files[allIndexes[i]];
+      console.log(`[handleBatchCropConfirm] Processing ${i + 1}/${allIndexes.length}: ${filePath}`);
       onProgress(i + 1);
 
       try {
-        // Load image
+        // Load image using electronAPI.readFile for reliable file:// access
+        const dataUrl = electronAPI.readFile(filePath);
+        if (!dataUrl) {
+          throw new Error('Failed to read file');
+        }
+
         const img = new Image();
-        img.crossOrigin = 'anonymous';
         await new Promise((resolve, reject) => {
           img.onload = resolve;
-          img.onerror = reject;
-          img.src = `file://${filePath}`;
+          img.onerror = () => reject(new Error('Image load failed'));
+          img.src = dataUrl;
         });
 
         // Create canvas and crop
@@ -236,13 +261,22 @@ function App() {
     // Show result feedback
     if (failCount > 0) {
       alert(t('completedMessage', { success: successCount, failed: failCount }));
+    } else {
+      setToast({ visible: true, message: t('batchSuccess', { count: successCount }) });
     }
 
     // Refresh folder after batch complete
     if (currentPath) {
-      loadFolder(currentPath);
+      loadFolder(currentPath, true); // preserve index, refresh cache
     }
+
+    // Update current image display
+    if (currentImage) {
+      setLocalImage(`file://${currentImage}?t=${Date.now()}`);
+    }
+
     setIsEditing(false);
+    setIsModified(false);
   };
 
   const handleClear = () => {
@@ -297,27 +331,9 @@ function App() {
         />
 
         {/* Center: Main Viewport */}
-        <main className="flex-1 relative flex items-center justify-center p-8 bg-black/40">
+        <main className="flex-1 min-w-0 relative flex items-center justify-center p-4 bg-black/40">
           <AnimatePresence mode="wait">
-            {localImage && isEditing ? (
-              <motion.div
-                key="editor"
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.98 }}
-                className="absolute inset-0 z-20"
-              >
-                <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="text-white/60 animate-pulse">Loading editor...</div></div>}>
-                  <ImageCropper
-                    imageSrc={localImage}
-                    onCancel={() => setIsEditing(false)}
-                    onComplete={handleCropComplete}
-                    fileCount={files.length}
-                    onApplyToAll={handleApplyToAll}
-                  />
-                </Suspense>
-              </motion.div>
-            ) : localImage ? (
+            {localImage && !isEditing ? (
               <motion.div
                 key="viewer"
                 initial={{ opacity: 0 }}
@@ -327,7 +343,7 @@ function App() {
               >
                 <ImageViewer src={localImage} />
               </motion.div>
-            ) : (
+            ) : !localImage ? (
               <motion.div
                 key="dropzone"
                 initial={{ opacity: 0 }}
@@ -340,13 +356,36 @@ function App() {
                   {t("selectFolder")}
                 </div>
               </motion.div>
+            ) : null}
+          </AnimatePresence>
+
+          {/* Image Cropper - inside main area */}
+          <AnimatePresence>
+            {localImage && isEditing && (
+              <motion.div
+                key="editor"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 z-20 bg-black"
+              >
+                <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="text-white/60 animate-pulse">Loading editor...</div></div>}>
+                  <ImageCropper
+                    imageSrc={localImage}
+                    onCancel={() => setIsEditing(false)}
+                    onComplete={handleCropComplete}
+                    fileCount={files.length}
+                    onApplyToAll={handleApplyToAll}
+                  />
+                </Suspense>
+              </motion.div>
             )}
           </AnimatePresence>
         </main>
 
-        {/* Right: Info Panel */}
+        {/* Right: Info Panel - hidden during editing */}
         <AnimatePresence>
-          {showInfoPanel && (
+          {showInfoPanel && !isEditing && (
             <InfoPanel metadata={currentMetadata} />
           )}
         </AnimatePresence>
@@ -367,10 +406,19 @@ function App() {
 
       {/* Capture Overlay */}
       {isCapturing && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-100 flex items-center justify-center">
           <div className="text-xl font-light tracking-[0.5em] animate-pulse">{t("capturing")}</div>
         </div>
       )}
+
+      {/* Toast Notification */}
+      <AnimatePresence>
+        <Toast
+          message={toast.message}
+          isVisible={toast.visible}
+          onHide={() => setToast({ visible: false, message: '' })}
+        />
+      </AnimatePresence>
 
       {/* Batch Crop Modal */}
       <Suspense fallback={null}>

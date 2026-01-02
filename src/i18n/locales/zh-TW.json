@@ -55,5 +55,8 @@
   "modifiedDate": "修改日期",
   "unknown": "未知",
   "zoomLevel": "縮放: {level}%",
-  "resetZoom": "重設縮放"
+  "resetZoom": "重設縮放",
+  "cropSuccess": "裁切完成！",
+  "saveSuccess": "儲存成功！",
+  "batchSuccess": "批量裁切完成！已儲存 {count} 張圖片。"
 }

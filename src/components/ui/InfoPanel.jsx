@@ -23,9 +23,10 @@ export const InfoPanel = memo(function InfoPanel({ metadata }) {
 
     return (
         <motion.div
-            initial={{ x: 300 }}
-            animate={{ x: 0 }}
-            className="w-[280px] h-full bg-surface/30 backdrop-blur-xl border-l border-white/5 flex flex-col overflow-hidden p-6"
+            initial={{ x: 300, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: 300, opacity: 0 }}
+            className="w-[280px] h-full bg-surface/30 backdrop-blur-xl border-l border-white/5 flex flex-col overflow-hidden p-6 shrink-0"
         >
             <div className="flex items-center gap-2 mb-8 border-b border-white/5 pb-4">
                 <Info size={18} className="text-primary" />

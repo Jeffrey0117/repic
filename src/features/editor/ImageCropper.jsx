@@ -72,7 +72,7 @@ export const ImageCropper = ({ imageSrc, onCancel, onComplete, fileCount = 1, on
         <div className="flex flex-col h-full w-full bg-black select-none">
 
             {/* Cropper Container */}
-            <div className="relative flex-1 bg-black w-full h-full flex items-center justify-center overflow-hidden p-4">
+            <div className="relative flex-1 bg-black w-full flex items-center justify-center overflow-hidden p-4">
                 <div className="max-w-full max-h-full flex items-center justify-center relative">
                     <ReactCrop
                         crop={crop}
@@ -87,8 +87,8 @@ export const ImageCropper = ({ imageSrc, onCancel, onComplete, fileCount = 1, on
                             alt="Crop me"
                             onLoad={onImageLoad}
                             style={{
-                                maxHeight: '80vh',
-                                maxWidth: '100%',
+                                maxHeight: 'calc(100vh - 200px)',
+                                maxWidth: 'calc(100vw - 450px)',
                                 display: 'block'
                             }}
                         />

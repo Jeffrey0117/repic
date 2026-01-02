@@ -55,5 +55,8 @@
   "modifiedDate": "Modified Date",
   "unknown": "Unknown",
   "zoomLevel": "Zoom: {level}%",
-  "resetZoom": "Reset Zoom"
+  "resetZoom": "Reset Zoom",
+  "cropSuccess": "Crop completed!",
+  "saveSuccess": "Saved successfully!",
+  "batchSuccess": "Batch crop completed! {count} images saved."
 }

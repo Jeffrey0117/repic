@@ -165,7 +165,7 @@ export const BatchCropModal = ({
                                             key={filePath}
                                             onClick={() => !isCurrentImage && toggleFile(index)}
                                             disabled={isCurrentImage}
-                                            className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
+                                            className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all bg-black/40 ${
                                                 isCurrentImage
                                                     ? 'border-amber-500/50 opacity-50 cursor-not-allowed'
                                                     : isSelected
@@ -176,7 +176,7 @@ export const BatchCropModal = ({
                                             <img
                                                 src={`file://${filePath}`}
                                                 alt={fileName}
-                                                className="w-full h-full object-cover"
+                                                className="w-full h-full object-contain"
                                             />
 
                                             {/* Current Image Badge */}
