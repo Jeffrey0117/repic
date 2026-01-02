@@ -331,7 +331,7 @@ function App() {
         />
 
         {/* Center: Main Viewport */}
-        <main className="flex-1 min-w-0 relative flex items-center justify-center p-4 bg-black/40 transition-all duration-300 ease-out">
+        <main className="flex-1 min-w-0 relative flex items-center justify-center p-4 main-viewport-bg transition-all duration-300 ease-out">
           <AnimatePresence mode="wait">
             {localImage && !isEditing ? (
               <motion.div

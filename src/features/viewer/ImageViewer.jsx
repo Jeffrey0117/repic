@@ -147,8 +147,6 @@ export const ImageViewer = ({ src, showInfoPanel = true }) => {
                     style={{
                         maxWidth: maxImageWidth,
                         maxHeight: 'calc(100vh - 180px)',
-                        minWidth: '200px',
-                        minHeight: '150px',
                         objectFit: 'contain',
                         transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
                         transition: isDragging ? 'none' : 'transform 0.1s ease-out, max-width 0.3s ease-out, max-height 0.3s ease-out'

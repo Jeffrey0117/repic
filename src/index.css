@@ -59,6 +59,15 @@ body {
   border: 1px solid rgba(0, 0, 0, 0.2);
 }
 
+/* Main viewport background - theme aware */
+.main-viewport-bg {
+  background-color: rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="light"] .main-viewport-bg {
+  background-color: rgba(200, 200, 200, 0.3);
+}
+
 /* Hide scrollbar for Chrome, Safari and Opera */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
