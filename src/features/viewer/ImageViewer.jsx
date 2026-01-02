@@ -141,10 +141,10 @@ export const ImageViewer = ({ src }) => {
                 ref={imageRef}
                 src={src}
                 alt="View"
-                className="block select-none rounded-lg shadow-[0_0_50px_rgba(0,0,0,0.5)] border border-white/5"
+                className="block select-none rounded-md"
                 style={{
-                    maxWidth: 'calc(100% - 48px)',
-                    maxHeight: 'calc(100% - 48px)',
+                    maxWidth: 'calc(100% - 24px)',
+                    maxHeight: 'calc(100% - 24px)',
                     objectFit: 'contain',
                     transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
                     transition: isDragging ? 'none' : 'transform 0.15s ease-out'
