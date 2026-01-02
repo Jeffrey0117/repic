@@ -113,7 +113,7 @@ export const ImageViewer = ({ src }) => {
         <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="w-full h-full flex items-center justify-center overflow-hidden transition-all duration-300 ease-out"
+            className="w-full h-full flex items-center justify-center overflow-hidden"
         >
             {/* Zoom percentage indicator */}
             {scale !== 1 && (
@@ -130,7 +130,7 @@ export const ImageViewer = ({ src }) => {
                 ref={containerRef}
                 onDoubleClick={handleDoubleClick}
                 onMouseDown={handleMouseDown}
-                className="group shadow-[0_0_50px_rgba(0,0,0,0.5)] rounded-lg overflow-hidden border border-white/5 transition-all duration-300 ease-out"
+                className="group shadow-[0_0_50px_rgba(0,0,0,0.5)] rounded-lg overflow-hidden border border-white/5"
                 style={{ cursor: getCursor() }}
             >
                 <img
@@ -139,8 +139,8 @@ export const ImageViewer = ({ src }) => {
                     alt="View"
                     className="block select-none"
                     style={{
-                        maxWidth: '100%',
-                        maxHeight: 'calc(100vh - 180px)',
+                        maxWidth: 'calc(100vw - 200px)',
+                        maxHeight: 'calc(100vh - 140px)',
                         objectFit: 'contain',
                         transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
                         transition: isDragging ? 'none' : 'transform 0.1s ease-out'
