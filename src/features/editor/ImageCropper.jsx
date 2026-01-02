@@ -6,9 +6,12 @@ import getCroppedImg from './utils/canvasUtils';
 import { AnnotationLayer } from './AnnotationLayer';
 import { Layers } from '../../components/icons';
 import useI18n from '../../hooks/useI18n';
+import { useTheme } from '../../contexts/ThemeContext';
 
 export const ImageCropper = ({ imageSrc, onCancel, onComplete, fileCount = 1, onApplyToAll }) => {
     const { t } = useI18n();
+    const { theme } = useTheme();
+    const isDark = theme === 'dark';
     const [crop, setCrop] = useState();
     const [completedCrop, setCompletedCrop] = useState(null);
     const [activeTool, setActiveTool] = useState(null);
@@ -104,16 +107,20 @@ export const ImageCropper = ({ imageSrc, onCancel, onComplete, fileCount = 1, on
                 </div>
             </div>
 
-            {/* Controls Toolbar */}
-            <div className="bg-surface/90 backdrop-blur-md pb-safe-area-bottom px-8 py-4 space-y-4 shadow-glass w-full border-t border-white/10 z-20">
+            {/* Controls Toolbar - theme aware */}
+            <div className={`backdrop-blur-md pb-safe-area-bottom px-8 py-4 space-y-4 shadow-glass w-full border-t z-20 ${isDark ? 'bg-surface/90 border-white/10' : 'bg-gray-100/95 border-black/10'}`}>
 
                 {/* Mode Tools */}
-                <div className="flex justify-center gap-2 border-b border-white/5 pb-4">
+                <div className={`flex justify-center gap-2 border-b pb-4 ${isDark ? 'border-white/5' : 'border-black/5'}`}>
                     {tools.map(tool => (
                         <button
                             key={tool.id ?? 'crop'}
                             onClick={() => setActiveTool(tool.id)}
-                            className={`px-3 py-1.5 rounded-lg text-xs transition-all ${activeTool === tool.id ? 'bg-primary text-white' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}
+                            className={`px-3 py-1.5 rounded-lg text-xs transition-all ${activeTool === tool.id
+                                ? 'bg-primary text-white'
+                                : isDark
+                                    ? 'bg-white/5 text-white/60 hover:bg-white/10'
+                                    : 'bg-black/5 text-black/60 hover:bg-black/10'}`}
                         >
                             {tool.label}
                         </button>
@@ -121,12 +128,12 @@ export const ImageCropper = ({ imageSrc, onCancel, onComplete, fileCount = 1, on
                 </div>
 
                 <div className="flex justify-between items-center max-w-2xl mx-auto w-full pt-2">
-                    <Button variant="text" onClick={onCancel} className="text-white/70 hover:text-white">
+                    <Button variant="text" onClick={onCancel} className={isDark ? 'text-white/70 hover:text-white' : 'text-black/70 hover:text-black'}>
                         {t('cancel')}
                     </Button>
 
                     <div className="flex items-center gap-4">
-                        <span className="text-sm font-semibold text-white tracking-wide">
+                        <span className={`text-sm font-semibold tracking-wide ${isDark ? 'text-white' : 'text-black'}`}>
                             {activeTool ? t('draw', { tool: activeTool }) : t('cropMode')}
                         </span>
 
@@ -134,7 +141,7 @@ export const ImageCropper = ({ imageSrc, onCancel, onComplete, fileCount = 1, on
                         {fileCount > 1 && crop && (
                             <button
                                 onClick={() => onApplyToAll?.(crop)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded-lg text-xs font-medium transition-all border border-amber-500/30"
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-500 rounded-lg text-xs font-medium transition-all border border-amber-500/30"
                             >
                                 <Layers size={14} />
                                 {t('applyToOthers')}
