@@ -22,11 +22,15 @@ export const InfoPanel = memo(function InfoPanel({ metadata, isVisible = true })
         <div
             className={`
                 h-full bg-surface/30 backdrop-blur-xl border-l border-white/5
-                flex flex-col overflow-hidden
+                flex flex-col
                 transition-all duration-300 ease-out
-                ${isVisible ? 'opacity-100 p-6' : 'opacity-0 p-0'}
+                ${isVisible ? 'opacity-100 p-6 w-70' : 'opacity-0 p-0 w-0'}
             `}
             style={{
+                // Prevent content from overflowing when width is 0
+                overflow: 'hidden',
+                // Prevent flex shrink to maintain width
+                flexShrink: 0,
                 // Content visibility helps with performance when hidden
                 contentVisibility: isVisible ? 'visible' : 'hidden'
             }}
