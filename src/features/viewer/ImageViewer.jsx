@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { motion } from '../../lib/motion';
 import useI18n from '../../hooks/useI18n';
 
 export const ImageViewer = ({ src }) => {

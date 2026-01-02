@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, FolderOutput, Replace, Loader2, Check, FolderOpen } from 'lucide-react';
+import { motion, AnimatePresence } from '../../lib/motion';
+import { X, FolderOutput, Replace, Loader2, Check, FolderOpen } from '../icons';
 import { Button } from './Button';
 import useI18n from '../../hooks/useI18n';
 

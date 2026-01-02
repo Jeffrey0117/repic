@@ -1,6 +1,6 @@
 import { memo } from 'react';
-import { motion } from 'framer-motion';
-import { Info, BarChart3, Database, Calendar } from 'lucide-react';
+import { motion } from '../../lib/motion';
+import { Info, BarChart3, Database, Calendar } from '../icons';
 import useI18n from '../../hooks/useI18n';
 
 export const InfoPanel = memo(function InfoPanel({ metadata }) {

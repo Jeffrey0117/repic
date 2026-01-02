@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Camera, X, Check, Copy } from 'lucide-react';
+import { Camera, X, Check, Copy } from '../../components/icons';
 
 // Check if electronAPI is available (injected via preload script)
 const electronAPI = window.electronAPI || null;

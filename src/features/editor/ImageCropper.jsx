@@ -4,7 +4,7 @@ import 'react-image-crop/dist/ReactCrop.css';
 import { Button } from '../../components/ui/Button';
 import getCroppedImg from './utils/canvasUtils';
 import { AnnotationLayer } from './AnnotationLayer';
-import { Layers } from 'lucide-react';
+import { Layers } from '../../components/icons';
 import useI18n from '../../hooks/useI18n';
 
 export const ImageCropper = ({ imageSrc, onCancel, onComplete, fileCount = 1, onApplyToAll }) => {
@@ -16,6 +16,8 @@ export const ImageCropper = ({ imageSrc, onCancel, onComplete, fileCount = 1, on
     const imgRef = useRef(null);
 
     const onImageLoad = (e) => {
+        const { width, height } = e.currentTarget;
+
         // Set initial crop to cover 100% of the image per SPEC-001
         const initialCrop = {
             unit: '%',
@@ -25,9 +27,19 @@ export const ImageCropper = ({ imageSrc, onCancel, onComplete, fileCount = 1, on
             y: 0
         };
         setCrop(initialCrop);
+
+        // Also set completedCrop in pixels for immediate save capability
+        setCompletedCrop({
+            unit: 'px',
+            width,
+            height,
+            x: 0,
+            y: 0
+        });
     };
 
     const handleSave = async () => {
+        console.log('[ImageCropper] handleSave', { completedCrop, imgRef: imgRef.current });
         if (completedCrop && imgRef.current) {
             try {
                 const croppedImage = await getCroppedImg(
@@ -37,11 +49,13 @@ export const ImageCropper = ({ imageSrc, onCancel, onComplete, fileCount = 1, on
                     1,  // scale
                     annotations
                 );
+                console.log('[ImageCropper] croppedImage generated', croppedImage?.substring(0, 50));
                 onComplete(croppedImage);
             } catch (e) {
-                console.error(e);
+                console.error('[ImageCropper] getCroppedImg error:', e);
             }
         } else {
+            console.log('[ImageCropper] no crop, returning original');
             onComplete(imageSrc);
         }
     };

@@ -1,6 +1,5 @@
-import { motion } from 'framer-motion';
-import clsx from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { motion } from '../../lib/motion';
+import { cn } from '../../lib/cn';
 
 export const Button = ({
     children,
@@ -22,7 +21,7 @@ export const Button = ({
     return (
         <motion.button
             whileTap={{ scale: 0.96 }}
-            className={twMerge(baseStyles, variants[variant], className)}
+            className={cn(baseStyles, variants[variant], className)}
             onClick={onClick}
             disabled={disabled}
         >

@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { motion } from '../../lib/motion';
 import {
     FolderOpen,
     RotateCcw,
@@ -8,7 +8,7 @@ import {
     Camera,
     Info,
     Globe
-} from 'lucide-react';
+} from '../icons';
 import { Button } from './Button';
 import useI18n from '../../hooks/useI18n';
 

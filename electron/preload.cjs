@@ -160,5 +160,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
 
     // Check if running in Electron
-    isElectron: true
+    isElectron: true,
+
+    // Native image processing (via @modern-ffi/core + libvips)
+    nativeCrop: async (inputPath, outputPath, crop) => {
+        if (!isValidPath(inputPath) || !isValidPath(outputPath)) {
+            return { success: false, error: 'Invalid path' };
+        }
+        if (!crop || typeof crop.x !== 'number' || typeof crop.y !== 'number' ||
+            typeof crop.width !== 'number' || typeof crop.height !== 'number') {
+            return { success: false, error: 'Invalid crop parameters' };
+        }
+        return await ipcRenderer.invoke('native-crop', { inputPath, outputPath, crop });
+    },
+
+    // Check if native processing is available
+    isNativeAvailable: async () => {
+        const result = await ipcRenderer.invoke('native-available');
+        return result.available;
+    }
 });

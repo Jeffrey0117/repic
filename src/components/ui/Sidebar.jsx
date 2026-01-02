@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { motion } from '../../lib/motion';
 
 export const Sidebar = ({ files, currentIndex, onSelect, cacheVersion = 0 }) => {
     return (

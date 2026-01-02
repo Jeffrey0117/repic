@@ -46,17 +46,13 @@
     }
   },
   "dependencies": {
-    "clsx": "^2.1.1",
-    "framer-motion": "^12.23.26",
-    "lucide-react": "^0.562.0",
+    "@modern-ffi/core": "file:../modern-ffi/packages/core",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "react-image-crop": "^11.0.10",
-    "tailwind-merge": "^3.4.0"
+    "react-image-crop": "^11.0.10"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
-    "electron": "^31.7.7",
     "@tailwindcss/postcss": "^4.1.18",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
@@ -64,6 +60,7 @@
     "autoprefixer": "^10.4.23",
     "concurrently": "^9.2.1",
     "cross-env": "^10.1.0",
+    "electron": "^31.7.7",
     "electron-builder": "^26.0.12",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",

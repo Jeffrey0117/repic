@@ -1,5 +1,5 @@
-import { motion } from 'framer-motion';
-import { Download, X, Check } from 'lucide-react';
+import { motion } from '../../lib/motion';
+import { Download, X, Check } from '../icons';
 import { Button } from './Button';
 import useI18n from '../../hooks/useI18n';
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion } from './lib/motion';
 import { Dropzone } from './features/viewer/Dropzone';
 import { ImageViewer } from './features/viewer/ImageViewer';
 import { Sidebar } from './components/ui/Sidebar';
@@ -322,17 +322,24 @@ function App() {
                 key="viewer"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
                 className="w-full h-full flex items-center justify-center"
               >
                 <ImageViewer src={localImage} />
               </motion.div>
             ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center opacity-40">
+              <motion.div
+                key="dropzone"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.4 }}
+                exit={{ opacity: 0 }}
+                className="w-full h-full flex flex-col items-center justify-center"
+              >
                 <Dropzone onImageUpload={handleImageUpload} onOpenFolder={handleOpenFile} />
                 <div className="mt-8 text-sm tracking-widest uppercase animate-pulse">
                   {t("selectFolder")}
                 </div>
-              </div>
+              </motion.div>
             )}
           </AnimatePresence>
         </main>

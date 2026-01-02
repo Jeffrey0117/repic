@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
-import { Upload, Image as ImageIcon, FolderOpen } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import clsx from 'clsx';
+import { Upload, ImageIcon, FolderOpen } from '../../components/icons';
+import { motion, AnimatePresence } from '../../lib/motion';
+import { cn } from '../../lib/cn';
 import { Button } from '../../components/ui/Button';
 import useI18n from '../../hooks/useI18n';
 
@@ -51,7 +51,7 @@ export const Dropzone = ({ onImageUpload, onOpenFolder }) => {
 
     return (
         <div
-            className={clsx(
+            className={cn(
                 "fixed inset-0 flex items-center justify-center transition-colors duration-200",
                 isDragActive ? "bg-primary/20 backdrop-blur-sm" : "bg-background"
             )}

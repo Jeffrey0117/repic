@@ -1,6 +1,7 @@
 import { drawAnnotation } from './drawingHelpers.js';
 
-// Adapted for react-image-crop output
+// Processes crop data from Cropper component
+// crop: { x, y, width, height } in pixels
 export default async function getCroppedImg(
     image,
     crop,

@@ -2,6 +2,10 @@ const { app, BrowserWindow, Menu, ipcMain, desktopCapturer, dialog } = require('
 const path = require('path');
 const fs = require('fs');
 
+// Native image processing via @modern-ffi/core + libvips
+let libvips = null;
+let nativeAvailable = false;
+
 let mainWindow;
 
 // Input validation helpers
@@ -160,6 +164,30 @@ function setupIpcHandlers() {
         return result;
     });
 
+    // Native crop using libvips + @modern-ffi/core (fast, low memory)
+    ipcMain.handle('native-crop', async (event, { inputPath, outputPath, crop }) => {
+        console.log('[native-crop] Received:', { inputPath, outputPath, crop });
+
+        if (!isValidPath(inputPath) || !isValidPath(outputPath)) {
+            return { success: false, error: 'Invalid path' };
+        }
+
+        // Try native libvips first
+        if (nativeAvailable && libvips) {
+            const result = await libvips.cropImage(inputPath, outputPath, crop);
+            console.log('[native-crop] libvips result:', result);
+            return result;
+        }
+
+        // Fallback: not available
+        return { success: false, error: 'Native processing not available', fallback: true };
+    });
+
+    // Check if native processing is available
+    ipcMain.handle('native-available', () => {
+        return { available: nativeAvailable };
+    });
+
     // Batch crop - save cropped image data to file
     ipcMain.handle('batch-crop-save', async (event, { filePath, base64Data, outputMode, originalPath, customDir }) => {
         console.log('[batch-crop-save] Received:', { filePath, outputMode, originalPath, customDir, hasBase64: !!base64Data });
@@ -216,7 +244,17 @@ function setupIpcHandlers() {
     });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+    // Try to initialize native libvips
+    try {
+        libvips = require('./native/libvips.cjs');
+        nativeAvailable = await libvips.init();
+        console.log('[main] Native libvips available:', nativeAvailable);
+    } catch (e) {
+        console.warn('[main] Native libvips not available:', e.message);
+        nativeAvailable = false;
+    }
+
     setupIpcHandlers();
     createWindow();
 
