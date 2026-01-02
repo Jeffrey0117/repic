@@ -111,14 +111,18 @@ export const ImageViewer = ({ src }) => {
 
     return (
         <motion.div
+            ref={containerRef}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
+            onDoubleClick={handleDoubleClick}
+            onMouseDown={handleMouseDown}
             className="w-full h-full flex items-center justify-center overflow-hidden"
+            style={{ cursor: getCursor() }}
         >
             {/* Zoom percentage indicator */}
             {scale !== 1 && (
                 <div
-                    className="fixed top-20 left-44 z-10 bg-black/60 backdrop-blur-md text-white text-xs px-3 py-1.5 rounded-full font-mono tracking-wide shadow-lg border border-white/10 cursor-pointer hover:bg-black/80 transition-colors"
+                    className="absolute top-4 left-4 z-10 bg-black/60 backdrop-blur-md text-white text-xs px-3 py-1.5 rounded-full font-mono tracking-wide shadow-lg border border-white/10 cursor-pointer hover:bg-black/80 transition-colors"
                     onClick={handleDoubleClick}
                     title={t('resetZoom')}
                 >
@@ -126,36 +130,27 @@ export const ImageViewer = ({ src }) => {
                 </div>
             )}
 
-            <div
-                ref={containerRef}
-                onDoubleClick={handleDoubleClick}
-                onMouseDown={handleMouseDown}
-                className="group shadow-[0_0_50px_rgba(0,0,0,0.5)] rounded-lg overflow-hidden border border-white/5 flex items-center justify-center"
-                style={{ cursor: getCursor(), maxWidth: '100%', maxHeight: '100%' }}
-            >
-                <img
-                    ref={imageRef}
-                    src={src}
-                    alt="View"
-                    className="block select-none max-w-full max-h-full"
-                    style={{
-                        objectFit: 'contain',
-                        transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-                        transition: isDragging ? 'none' : 'transform 0.1s ease-out'
-                    }}
-                    draggable={false}
-                />
+            {/* Unsaved indicator */}
+            {src.startsWith('data:') && (
+                <div className="absolute top-4 right-4 z-10 bg-primary/80 backdrop-blur-md text-[10px] text-white px-2 py-1 rounded-full uppercase tracking-widest font-bold shadow-lg">
+                    Unsaved
+                </div>
+            )}
 
-                {/* Unsaved indicator */}
-                {src.startsWith('data:') && (
-                    <div className="absolute top-4 right-4 bg-primary/80 backdrop-blur-md text-[10px] text-white px-2 py-1 rounded-full uppercase tracking-widest font-bold shadow-lg">
-                        Unsaved
-                    </div>
-                )}
-
-                {/* Subtle shine overlay */}
-                <div className="absolute inset-0 pointer-events-none bg-linear-to-tr from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
-            </div>
+            <img
+                ref={imageRef}
+                src={src}
+                alt="View"
+                className="block select-none rounded-lg shadow-[0_0_50px_rgba(0,0,0,0.5)] border border-white/5"
+                style={{
+                    maxWidth: 'calc(100% - 32px)',
+                    maxHeight: 'calc(100% - 32px)',
+                    objectFit: 'contain',
+                    transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+                    transition: isDragging ? 'none' : 'transform 0.15s ease-out'
+                }}
+                draggable={false}
+            />
         </motion.div>
     );
 };
