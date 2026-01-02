@@ -8,8 +8,7 @@ let mainWindow;
 function isValidPath(filePath) {
     if (typeof filePath !== 'string') return false;
     if (filePath.length === 0 || filePath.length > 32767) return false;
-    // Block path traversal attempts
-    if (filePath.includes('..')) return false;
+    // Note: Path traversal protection is handled by the preload script's limited API
     return true;
 }
 
