@@ -1,4 +1,4 @@
-import { Icon } from '../Icon';
+import { Icon } from './Icon';
 
 export const Calendar = ({ size, className, ...props }) => (
     <Icon size={size} className={className} {...props}>

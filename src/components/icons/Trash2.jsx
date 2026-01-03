@@ -1,4 +1,4 @@
-import { Icon } from '../Icon';
+import { Icon } from './Icon';
 
 export const Trash2 = ({ size, className, ...props }) => (
     <Icon size={size} className={className} {...props}>

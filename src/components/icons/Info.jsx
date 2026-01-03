@@ -1,4 +1,4 @@
-import { Icon } from '../Icon';
+import { Icon } from './Icon';
 
 export const Info = ({ size, className, ...props }) => (
     <Icon size={size} className={className} {...props}>
