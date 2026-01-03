@@ -113,7 +113,7 @@ export const ImageViewer = ({ src }) => {
             ref={containerRef}
             onDoubleClick={handleDoubleClick}
             onMouseDown={handleMouseDown}
-            className="w-full h-full flex items-center justify-center overflow-hidden relative"
+            className="w-full h-full flex items-center justify-center overflow-hidden relative bg-transparent"
             style={{ cursor: getCursor() }}
         >
             {/* Zoom percentage indicator */}

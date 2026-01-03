@@ -321,9 +321,11 @@ function App() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="absolute inset-0 p-4"
+                className="absolute inset-0 z-10 bg-[#0f0f0f]"
               >
-                <ImageViewer src={localImage} />
+                <div className="w-full h-full p-4">
+                  <ImageViewer src={localImage} />
+                </div>
               </motion.div>
             ) : !localImage ? (
               <motion.div
