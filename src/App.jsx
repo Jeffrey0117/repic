@@ -294,7 +294,8 @@ function App() {
       <TopBar
         currentPath={currentPath}
         onOpenFolder={handleOpenFile}
-        onEdit={() => setIsEditing(true)}
+        isEditing={isEditing}
+        onToggleEdit={() => setIsEditing(!isEditing)}
         onClear={handleClear}
         onSave={handleSave}
         showInfoPanel={showInfoPanel}

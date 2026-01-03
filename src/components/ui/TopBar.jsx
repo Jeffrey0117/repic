@@ -17,7 +17,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 // Check if electronAPI is available (injected via preload script)
 const electronAPI = window.electronAPI || null;
 
-export const TopBar = ({ currentPath, onOpenFolder, onEdit, onClear, onSave, showInfoPanel, onToggleInfo }) => {
+export const TopBar = ({ currentPath, onOpenFolder, isEditing, onToggleEdit, onClear, onSave, showInfoPanel, onToggleInfo }) => {
     const { t, language, setLanguage } = useI18n();
     const { theme, toggleTheme } = useTheme();
 
@@ -54,7 +54,7 @@ export const TopBar = ({ currentPath, onOpenFolder, onEdit, onClear, onSave, sho
             {/* Center: Main Tools */}
             <div className="flex items-center bg-black/20 rounded-xl p-1 border border-white/5">
                 <ToolButton icon={RotateCcw} title={t('refresh')} onClick={() => window.location.reload()} />
-                <ToolButton icon={Scissors} title={t('editArea')} onClick={onEdit} />
+                <ToolButton icon={Scissors} title={t('editArea')} onClick={onToggleEdit} active={isEditing} />
                 <ToolButton icon={Trash2} title={t('delete')} className="text-danger" onClick={onClear} />
             </div>
 
@@ -93,12 +93,12 @@ export const TopBar = ({ currentPath, onOpenFolder, onEdit, onClear, onSave, sho
     );
 };
 
-const ToolButton = ({ icon: Icon, title, onClick, className = "" }) => (
+const ToolButton = ({ icon: Icon, title, onClick, className = "", active = false }) => (
     <button
         onClick={onClick}
         title={title}
-        className={`p-2 hover:bg-white/10 rounded-lg transition-all text-white/60 hover:text-white ${className}`}
+        className={`p-2.5 rounded-lg transition-all ${active ? 'bg-primary/20 text-primary' : 'hover:bg-white/10 text-white/60 hover:text-white'} ${className}`}
     >
-        <Icon size={18} />
+        <Icon size={22} />
     </button>
 );
