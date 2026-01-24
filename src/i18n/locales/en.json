@@ -82,5 +82,13 @@
   "pasteImageUrl": "Paste image URL...",
   "addImage": "Add",
   "downloadSuccess": "Downloaded successfully!",
-  "downloadFailed": "Download failed: {error}"
+  "downloadFailed": "Download failed: {error}",
+  "expandSidebar": "Expand sidebar",
+  "collapseSidebar": "Collapse sidebar",
+  "albumNameLabel": "Album",
+  "imageSource": "Source",
+  "imageUrl": "URL",
+  "addedDate": "Added",
+  "imageIndex": "Position",
+  "noImageSelected": "No image selected"
 }

@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Info, BarChart3, Database, Calendar } from '../icons';
+import { Info, BarChart3, Database, Calendar, Globe, Album } from '../icons';
 import useI18n from '../../hooks/useI18n';
 
 // Panel width constant for consistency
@@ -8,7 +8,15 @@ const PANEL_WIDTH = 280;
 // Transition duration in ms
 const TRANSITION_DURATION = 250;
 
-export const InfoPanel = memo(function InfoPanel({ metadata, isVisible = true }) {
+// Link icon
+const Link = ({ size = 24, className = '' }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+    </svg>
+);
+
+export const InfoPanel = memo(function InfoPanel({ metadata, isVisible = true, mode = 'local' }) {
     const { t, language } = useI18n();
 
     const formatDate = (date) => {
@@ -22,6 +30,16 @@ export const InfoPanel = memo(function InfoPanel({ metadata, isVisible = true })
         const sizes = ['B', 'KB', 'MB', 'GB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    };
+
+    // Extract domain from URL
+    const getDomain = (url) => {
+        if (!url) return t('unknown');
+        try {
+            return new URL(url).hostname;
+        } catch {
+            return url.substring(0, 30) + '...';
+        }
     };
 
     // CSS transition for smooth open/close - width based, not transform
@@ -46,29 +64,79 @@ export const InfoPanel = memo(function InfoPanel({ metadata, isVisible = true })
                         </div>
 
                         <div className="space-y-8 overflow-y-auto no-scrollbar pr-2 flex-1">
-                            <InfoItem
-                                icon={<BarChart3 size={16} />}
-                                label={t('imageResolution')}
-                                value={`${metadata.width} x ${metadata.height}`}
-                            />
+                            {mode === 'web' ? (
+                                <>
+                                    {/* Web image info */}
+                                    <InfoItem
+                                        icon={<Album size={16} />}
+                                        label={t('albumNameLabel')}
+                                        value={metadata.albumName || t('unknown')}
+                                    />
 
-                            <InfoItem
-                                icon={<Database size={16} />}
-                                label={t('fileSize')}
-                                value={formatSize(metadata.size)}
-                            />
+                                    <InfoItem
+                                        icon={<Globe size={16} />}
+                                        label={t('imageSource')}
+                                        value={getDomain(metadata.url)}
+                                    />
 
-                            <InfoItem
-                                icon={<Calendar size={16} />}
-                                label={t('createdDate')}
-                                value={formatDate(metadata.birthtime)}
-                            />
+                                    <InfoItem
+                                        icon={<Link size={16} />}
+                                        label={t('imageUrl')}
+                                        value={
+                                            <a
+                                                href={metadata.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-primary hover:underline break-all text-xs"
+                                                title={metadata.url}
+                                            >
+                                                {metadata.url?.length > 50
+                                                    ? metadata.url.substring(0, 50) + '...'
+                                                    : metadata.url}
+                                            </a>
+                                        }
+                                    />
 
-                            <InfoItem
-                                icon={<Calendar size={16} />}
-                                label={t('modifiedDate')}
-                                value={formatDate(metadata.mtime)}
-                            />
+                                    <InfoItem
+                                        icon={<Calendar size={16} />}
+                                        label={t('addedDate')}
+                                        value={formatDate(metadata.addedAt)}
+                                    />
+
+                                    <InfoItem
+                                        icon={<BarChart3 size={16} />}
+                                        label={t('imageIndex')}
+                                        value={`${metadata.index + 1} / ${metadata.total}`}
+                                    />
+                                </>
+                            ) : (
+                                <>
+                                    {/* Local file info */}
+                                    <InfoItem
+                                        icon={<BarChart3 size={16} />}
+                                        label={t('imageResolution')}
+                                        value={`${metadata.width} x ${metadata.height}`}
+                                    />
+
+                                    <InfoItem
+                                        icon={<Database size={16} />}
+                                        label={t('fileSize')}
+                                        value={formatSize(metadata.size)}
+                                    />
+
+                                    <InfoItem
+                                        icon={<Calendar size={16} />}
+                                        label={t('createdDate')}
+                                        value={formatDate(metadata.birthtime)}
+                                    />
+
+                                    <InfoItem
+                                        icon={<Calendar size={16} />}
+                                        label={t('modifiedDate')}
+                                        value={formatDate(metadata.mtime)}
+                                    />
+                                </>
+                            )}
                         </div>
 
                         <div className="pt-4 border-t border-white/5 text-[10px] text-white/20 text-center uppercase tracking-[0.2em]">

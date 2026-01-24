@@ -73,6 +73,9 @@ function App() {
   // View mode: 'local' for file system view, 'album' for web album view
   const [viewMode, setViewMode] = useState('local');
 
+  // Album sidebar collapsed state
+  const [albumSidebarCollapsed, setAlbumSidebarCollapsed] = useState(false);
+
   // Sync file system image with local view only when currentImage or cacheVersion changes
   useEffect(() => {
     if (currentImage) {
@@ -536,6 +539,8 @@ function App() {
             onCreateAlbum={createAlbum}
             onRenameAlbum={renameAlbum}
             onDeleteAlbum={deleteAlbum}
+            isCollapsed={albumSidebarCollapsed}
+            onToggleCollapse={() => setAlbumSidebarCollapsed(!albumSidebarCollapsed)}
           />
         )}
 
@@ -629,13 +634,21 @@ function App() {
           </AnimatePresence>
         </main>
 
-        {/* Right: Info Panel - flex item with width transition (local mode only) */}
-        {viewMode === 'local' && (
-          <InfoPanel
-            metadata={currentMetadata}
-            isVisible={showInfoPanel && !isEditing}
-          />
-        )}
+        {/* Right: Info Panel - flex item with width transition */}
+        <InfoPanel
+          metadata={viewMode === 'album'
+            ? (currentAlbumImage ? {
+                albumName: selectedAlbum?.name,
+                url: currentAlbumImage,
+                addedAt: albumImages[albumImageIndex]?.addedAt,
+                index: albumImageIndex,
+                total: albumImages.length
+              } : null)
+            : currentMetadata
+          }
+          isVisible={showInfoPanel && !isEditing}
+          mode={viewMode === 'album' ? 'web' : 'local'}
+        />
       </div>
 
       {/* Post-Crop Save Toolbar */}

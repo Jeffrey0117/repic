@@ -82,5 +82,13 @@
   "pasteImageUrl": "貼上圖片網址...",
   "addImage": "新增",
   "downloadSuccess": "下載成功！",
-  "downloadFailed": "下載失敗：{error}"
+  "downloadFailed": "下載失敗：{error}",
+  "expandSidebar": "展開側邊欄",
+  "collapseSidebar": "收合側邊欄",
+  "albumNameLabel": "相簿",
+  "imageSource": "來源",
+  "imageUrl": "網址",
+  "addedDate": "加入時間",
+  "imageIndex": "位置",
+  "noImageSelected": "未選擇圖片"
 }
