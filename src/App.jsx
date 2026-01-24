@@ -36,7 +36,7 @@ function App() {
   // Local state for edits/UI
   const [localImage, setLocalImage] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [showInfoPanel, setShowInfoPanel] = useState(true);
+  const [showInfoPanel, setShowInfoPanel] = useState(false);
   const [isModified, setIsModified] = useState(false);
 
   // Batch crop state
