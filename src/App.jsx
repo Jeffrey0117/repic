@@ -532,19 +532,18 @@ function App() {
 
       {/* 2. Main Content Area */}
       <div className="flex-1 overflow-hidden flex">
-        {/* Album Sidebar - only in album mode, hidden when collapsed */}
-        <AnimatePresence>
-          {viewMode === 'album' && !albumSidebarCollapsed && (
-            <AlbumSidebar
-              albums={albums}
-              selectedAlbumId={selectedAlbumId}
-              onSelectAlbum={selectAlbum}
-              onCreateAlbum={createAlbum}
-              onRenameAlbum={renameAlbum}
-              onDeleteAlbum={deleteAlbum}
-            />
-          )}
-        </AnimatePresence>
+        {/* Album Sidebar - only in album mode */}
+        {viewMode === 'album' && (
+          <AlbumSidebar
+            albums={albums}
+            selectedAlbumId={selectedAlbumId}
+            onSelectAlbum={selectAlbum}
+            onCreateAlbum={createAlbum}
+            onRenameAlbum={renameAlbum}
+            onDeleteAlbum={deleteAlbum}
+            isVisible={!albumSidebarCollapsed}
+          />
+        )}
 
         {/* Left: Thumbnail Explorer */}
         <Sidebar
