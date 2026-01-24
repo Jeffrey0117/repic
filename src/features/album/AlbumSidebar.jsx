@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { motion, AnimatePresence } from '../../lib/motion';
+import { motion } from '../../lib/motion';
 import { FolderOpen, Trash2, X, Check } from '../../components/icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import useI18n from '../../hooks/useI18n';
@@ -77,15 +77,8 @@ export const AlbumSidebar = ({
         </h2>
       </div>
 
-      {/* Album List - hidden when collapsed */}
-      <AnimatePresence>
-        {!isCollapsed && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="flex-1 overflow-y-auto p-2 space-y-1"
-          >
+      {/* Album List */}
+      <div className="flex-1 overflow-y-auto p-2 space-y-1">
         {albums.map(album => (
           <div
             key={album.id}
@@ -210,9 +203,7 @@ export const AlbumSidebar = ({
             + {t('newAlbum')}
           </button>
         )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      </div>
     </motion.aside>
   );
 };
