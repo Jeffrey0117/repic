@@ -10,9 +10,7 @@ export const AlbumSidebar = ({
   onSelectAlbum,
   onCreateAlbum,
   onRenameAlbum,
-  onDeleteAlbum,
-  isCollapsed,
-  onToggleCollapse
+  onDeleteAlbum
 }) => {
   const { t } = useI18n();
   const { theme } = useTheme();
@@ -60,15 +58,13 @@ export const AlbumSidebar = ({
     }
   };
 
-  // When collapsed, width is 0 (completely hidden)
-  const sidebarWidth = isCollapsed ? 0 : 220;
-
   return (
     <motion.aside
-      initial={{ width: 220, opacity: 0 }}
-      animate={{ width: sidebarWidth, opacity: isCollapsed ? 0 : 1 }}
+      initial={{ width: 0, opacity: 0 }}
+      animate={{ width: 200, opacity: 1 }}
+      exit={{ width: 0, opacity: 0 }}
       transition={{ duration: 0.2, ease: 'easeInOut' }}
-      className={`h-full border-r flex flex-col overflow-hidden ${
+      className={`h-full border-r flex flex-col overflow-hidden shrink-0 ${
         theme === 'dark'
           ? 'bg-surface/50 border-white/5'
           : 'bg-gray-50 border-gray-200'
