@@ -5,29 +5,27 @@ const STORAGE_KEY = 'repic-web-albums';
 // Generate unique ID
 const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
+// Load albums from localStorage (for lazy initialization)
+const loadFromStorage = () => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch (e) {
+    console.error('[useWebAlbums] Failed to load from localStorage:', e);
+    return [];
+  }
+};
+
 /**
  * Hook for managing web albums with localStorage persistence
  */
 export const useWebAlbums = () => {
-  const [albums, setAlbums] = useState([]);
-  const [selectedAlbumId, setSelectedAlbumId] = useState(null);
-
-  // Load albums from localStorage on mount
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        setAlbums(parsed);
-        // Auto-select first album if exists
-        if (parsed.length > 0) {
-          setSelectedAlbumId(parsed[0].id);
-        }
-      }
-    } catch (e) {
-      console.error('[useWebAlbums] Failed to load from localStorage:', e);
-    }
-  }, []);
+  // Lazy initialization from localStorage - runs only once
+  const [albums, setAlbums] = useState(() => loadFromStorage());
+  const [selectedAlbumId, setSelectedAlbumId] = useState(() => {
+    const stored = loadFromStorage();
+    return stored.length > 0 ? stored[0].id : null;
+  });
 
   // Save albums to localStorage whenever they change
   useEffect(() => {
