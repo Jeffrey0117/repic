@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, lazy, Suspense, useCallback } from 'react';
 import { AnimatePresence, motion } from './lib/motion';
 import { Dropzone } from './features/viewer/Dropzone';
 import { ImageViewer } from './features/viewer/ImageViewer';
@@ -8,8 +8,9 @@ import { TopBar } from './components/ui/TopBar';
 import { SaveToolbar } from './components/ui/SaveToolbar';
 import { Toast } from './components/ui/Toast';
 import { UploadHistoryPanel } from './components/ui/UploadHistoryPanel';
-import { WebAlbumView } from './components/ui/WebAlbumView';
+import { AlbumSidebar } from './features/album/AlbumSidebar';
 import { useFileSystem } from './hooks/useFileSystem';
+import { useWebAlbums } from './hooks/useWebAlbums';
 import useI18n from './hooks/useI18n';
 
 // Lazy load heavy components
@@ -34,6 +35,22 @@ function App() {
     currentMetadata,
     cacheVersion
   } = useFileSystem();
+
+  // Web album hook
+  const {
+    albums,
+    selectedAlbum,
+    selectedAlbumId,
+    selectAlbum,
+    createAlbum,
+    renameAlbum,
+    deleteAlbum,
+    addImage: addAlbumImage,
+    removeImage: removeAlbumImage
+  } = useWebAlbums();
+
+  // Album image navigation state
+  const [albumImageIndex, setAlbumImageIndex] = useState(0);
 
   // Local state for edits/UI
   const [localImage, setLocalImage] = useState(null);
@@ -290,12 +307,84 @@ function App() {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    // For album mode: download web image to local
+    if (viewMode === 'album' && selectedAlbum && selectedAlbum.images[albumImageIndex]) {
+      const imageUrl = selectedAlbum.images[albumImageIndex].url;
+      const electronAPI = getElectronAPI();
+
+      try {
+        // Fetch image as blob
+        const response = await fetch(imageUrl);
+        if (!response.ok) throw new Error('Failed to fetch image');
+        const blob = await response.blob();
+
+        // Convert to base64
+        const reader = new FileReader();
+        const base64 = await new Promise((resolve, reject) => {
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+
+        // Get filename from URL
+        const urlFilename = imageUrl.split('/').pop()?.split('?')[0] || `image-${Date.now()}`;
+        const ext = blob.type.split('/')[1] || 'png';
+        const defaultName = urlFilename.includes('.') ? urlFilename : `${urlFilename}.${ext}`;
+
+        if (electronAPI) {
+          // Electron: use save dialog
+          const { canceled, filePath } = await electronAPI.showSaveDialog(defaultName);
+          if (!canceled && filePath) {
+            const result = await electronAPI.saveFile(filePath, base64);
+            if (result.success) {
+              setToast({ visible: true, message: t('downloadSuccess') });
+            } else {
+              throw new Error(result.error);
+            }
+          }
+        } else {
+          // Fallback: browser download
+          const link = document.createElement('a');
+          link.download = defaultName;
+          link.href = base64;
+          link.click();
+          setToast({ visible: true, message: t('downloadSuccess') });
+        }
+      } catch (error) {
+        console.error('[handleSave] Download error:', error);
+        setToast({ visible: true, message: t('downloadFailed', { error: error.message }) });
+      }
+      return;
+    }
+
+    // For local mode: existing behavior
     const link = document.createElement('a');
     link.download = `repic-${Date.now()}.png`;
     link.href = localImage;
     link.click();
   };
+
+  // Album navigation
+  const albumImages = selectedAlbum?.images || [];
+  const currentAlbumImage = albumImages[albumImageIndex]?.url || null;
+
+  const nextAlbumImage = useCallback(() => {
+    if (albumImageIndex < albumImages.length - 1) {
+      setAlbumImageIndex(albumImageIndex + 1);
+    }
+  }, [albumImageIndex, albumImages.length]);
+
+  const prevAlbumImage = useCallback(() => {
+    if (albumImageIndex > 0) {
+      setAlbumImageIndex(albumImageIndex - 1);
+    }
+  }, [albumImageIndex]);
+
+  // Reset album image index when album changes
+  useEffect(() => {
+    setAlbumImageIndex(0);
+  }, [selectedAlbumId]);
 
   const handleUpload = async () => {
     if (!localImage) {
@@ -401,12 +490,17 @@ function App() {
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (isEditing) return;
-      if (e.key === 'ArrowRight') nextImage();
-      if (e.key === 'ArrowLeft') prevImage();
+      if (viewMode === 'album') {
+        if (e.key === 'ArrowRight') nextAlbumImage();
+        if (e.key === 'ArrowLeft') prevAlbumImage();
+      } else {
+        if (e.key === 'ArrowRight') nextImage();
+        if (e.key === 'ArrowLeft') prevImage();
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isEditing, nextImage, prevImage]);
+  }, [isEditing, viewMode, nextImage, prevImage, nextAlbumImage, prevAlbumImage]);
 
   return (
     <div className="h-screen w-screen bg-[#0A0A0A] text-white overflow-hidden flex flex-col select-none">
@@ -427,89 +521,121 @@ function App() {
         onToggleInfo={() => setShowInfoPanel(!showInfoPanel)}
         viewMode={viewMode}
         onToggleViewMode={() => setViewMode(viewMode === 'local' ? 'album' : 'local')}
+        selectedAlbum={selectedAlbum}
+        onAddAlbumImage={(url) => selectedAlbumId && addAlbumImage(selectedAlbumId, url)}
       />
 
       {/* 2. Main Content Area */}
       <div className="flex-1 overflow-hidden flex">
-        <AnimatePresence mode="wait">
-          {viewMode === 'album' ? (
-            <WebAlbumView key="album-view" />
-          ) : (
-            <motion.div
-              key="local-view"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex-1 flex overflow-hidden"
-            >
-              {/* Left: Thumbnail Explorer */}
-              <Sidebar
-                files={files}
-                currentIndex={currentIndex}
-                cacheVersion={cacheVersion}
-                onSelect={selectImage}
-              />
+        {/* Album Sidebar - only in album mode */}
+        {viewMode === 'album' && (
+          <AlbumSidebar
+            albums={albums}
+            selectedAlbumId={selectedAlbumId}
+            onSelectAlbum={selectAlbum}
+            onCreateAlbum={createAlbum}
+            onRenameAlbum={renameAlbum}
+            onDeleteAlbum={deleteAlbum}
+          />
+        )}
 
-              {/* Center: Main Viewport */}
-              <main className="flex-1 min-w-0 relative main-viewport-bg overflow-hidden transition-all duration-250">
-                <AnimatePresence mode="wait">
-                  {localImage && !isEditing ? (
-                    <motion.div
-                      key="viewer"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="absolute inset-0 z-10 bg-[#0f0f0f]"
-                    >
-                      <div className="w-full h-full p-4">
-                        <ImageViewer src={localImage} />
-                      </div>
-                    </motion.div>
-                  ) : !localImage ? (
-                    <motion.div
-                      key="dropzone"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 0.4 }}
-                      exit={{ opacity: 0 }}
-                      className="absolute inset-4 flex flex-col items-center justify-center"
-                    >
-                      <Dropzone onOpenFolder={handleOpenFile} />
-                    </motion.div>
-                  ) : null}
-                </AnimatePresence>
+        {/* Left: Thumbnail Explorer */}
+        <Sidebar
+          files={viewMode === 'album' ? albumImages : files}
+          currentIndex={viewMode === 'album' ? albumImageIndex : currentIndex}
+          cacheVersion={cacheVersion}
+          onSelect={viewMode === 'album' ? setAlbumImageIndex : selectImage}
+          mode={viewMode === 'album' ? 'web' : 'local'}
+        />
 
-                {/* Image Cropper - inside main area */}
-                <AnimatePresence>
-                  {localImage && isEditing && (
-                    <motion.div
-                      key="editor"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="absolute inset-0 z-20 bg-black"
-                    >
-                      <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="text-white/60 animate-pulse">Loading editor...</div></div>}>
-                        <ImageCropper
-                          imageSrc={localImage}
-                          onCancel={() => setIsEditing(false)}
-                          onComplete={handleCropComplete}
-                          fileCount={files.length}
-                          onApplyToAll={handleApplyToAll}
-                        />
-                      </Suspense>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </main>
+        {/* Center: Main Viewport */}
+        <main className="flex-1 min-w-0 relative main-viewport-bg overflow-hidden transition-all duration-250">
+          <AnimatePresence mode="wait">
+            {viewMode === 'album' ? (
+              // Album mode
+              currentAlbumImage ? (
+                <motion.div
+                  key="album-viewer"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 z-10 bg-[#0f0f0f]"
+                >
+                  <div className="w-full h-full p-4">
+                    <ImageViewer src={currentAlbumImage} />
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="album-empty"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 0.4 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-4 flex flex-col items-center justify-center text-white/40"
+                >
+                  <p className="text-lg">{selectedAlbum ? t('emptyAlbum') : t('selectOrCreateAlbum')}</p>
+                  {selectedAlbum && <p className="text-sm mt-2">{t('pasteUrlHint')}</p>}
+                </motion.div>
+              )
+            ) : (
+              // Local mode
+              localImage && !isEditing ? (
+                <motion.div
+                  key="viewer"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 z-10 bg-[#0f0f0f]"
+                >
+                  <div className="w-full h-full p-4">
+                    <ImageViewer src={localImage} />
+                  </div>
+                </motion.div>
+              ) : !localImage ? (
+                <motion.div
+                  key="dropzone"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 0.4 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-4 flex flex-col items-center justify-center"
+                >
+                  <Dropzone onOpenFolder={handleOpenFile} />
+                </motion.div>
+              ) : null
+            )}
+          </AnimatePresence>
 
-              {/* Right: Info Panel - flex item with width transition */}
-              <InfoPanel
-                metadata={currentMetadata}
-                isVisible={showInfoPanel && !isEditing}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
+          {/* Image Cropper - inside main area (local mode only) */}
+          <AnimatePresence>
+            {viewMode === 'local' && localImage && isEditing && (
+              <motion.div
+                key="editor"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 z-20 bg-black"
+              >
+                <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="text-white/60 animate-pulse">Loading editor...</div></div>}>
+                  <ImageCropper
+                    imageSrc={localImage}
+                    onCancel={() => setIsEditing(false)}
+                    onComplete={handleCropComplete}
+                    fileCount={files.length}
+                    onApplyToAll={handleApplyToAll}
+                  />
+                </Suspense>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </main>
+
+        {/* Right: Info Panel - flex item with width transition (local mode only) */}
+        {viewMode === 'local' && (
+          <InfoPanel
+            metadata={currentMetadata}
+            isVisible={showInfoPanel && !isEditing}
+          />
+        )}
       </div>
 
       {/* Post-Crop Save Toolbar */}

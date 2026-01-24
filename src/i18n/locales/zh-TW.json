@@ -80,5 +80,7 @@
   "emptyAlbum": "此相簿是空的",
   "pasteUrlHint": "在下方貼上圖片網址以新增圖片",
   "pasteImageUrl": "貼上圖片網址...",
-  "addImage": "新增"
+  "addImage": "新增",
+  "downloadSuccess": "下載成功！",
+  "downloadFailed": "下載失敗：{error}"
 }

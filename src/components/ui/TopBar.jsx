@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { motion } from '../../lib/motion';
 import {
     FolderOpen,
@@ -20,12 +21,16 @@ import { useTheme } from '../../contexts/ThemeContext';
 // Check if electronAPI is available (injected via preload script)
 const electronAPI = window.electronAPI || null;
 
-export const TopBar = ({ currentPath, onOpenFolder, isEditing, onToggleEdit, onClear, onSave, onUpload, isUploading, uploadHistoryCount, onToggleUploadHistory, showInfoPanel, onToggleInfo, viewMode, onToggleViewMode }) => {
+export const TopBar = ({ currentPath, onOpenFolder, isEditing, onToggleEdit, onClear, onSave, onUpload, isUploading, uploadHistoryCount, onToggleUploadHistory, showInfoPanel, onToggleInfo, viewMode, onToggleViewMode, selectedAlbum, onAddAlbumImage }) => {
     const { t, language, setLanguage } = useI18n();
     const { theme, toggleTheme } = useTheme();
+    const [urlInput, setUrlInput] = useState('');
 
     // Get folder name using electronAPI or fallback
     const getFolderName = () => {
+        if (viewMode === 'album') {
+            return selectedAlbum?.name || t('selectOrCreateAlbum');
+        }
         if (!currentPath) return t('openFolder');
         if (electronAPI && electronAPI.path) {
             return electronAPI.path.basename(currentPath);
@@ -35,6 +40,27 @@ export const TopBar = ({ currentPath, onOpenFolder, isEditing, onToggleEdit, onC
     };
 
     const folderName = getFolderName();
+
+    const handleAddUrl = (e) => {
+        e.preventDefault();
+        if (urlInput.trim() && onAddAlbumImage) {
+            // Support multiple URLs (newline or comma separated)
+            const urls = urlInput.split(/[\n,]/).map(u => u.trim()).filter(Boolean);
+            urls.forEach(url => onAddAlbumImage(url));
+            setUrlInput('');
+        }
+    };
+
+    const handlePaste = (e) => {
+        const pastedText = e.clipboardData.getData('text');
+        if (pastedText) {
+            const urls = pastedText.split(/[\n,]/).map(u => u.trim()).filter(Boolean);
+            if (urls.length > 0 && urls.every(url => url.startsWith('http'))) {
+                e.preventDefault();
+                urls.forEach(url => onAddAlbumImage(url));
+            }
+        }
+    };
 
     const nextLang = language === 'en' ? 'zh-TW' : 'en';
     const langDisplay = language === 'en' ? 'EN' : '中';
@@ -49,17 +75,50 @@ export const TopBar = ({ currentPath, onOpenFolder, isEditing, onToggleEdit, onC
                     : 'bg-white/80 border-black/10'
             }`}
         >
-            {/* Left: Folder Info */}
-            <div
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all border ${
-                    theme === 'dark'
-                        ? 'bg-white/5 hover:bg-white/10 border-white/5'
-                        : 'bg-black/5 hover:bg-black/10 border-black/10'
-                }`}
-                onClick={onOpenFolder}
-            >
-                <FolderOpen size={16} className="text-primary" />
-                <span className={`text-xs font-medium max-w-[200px] truncate ${theme === 'dark' ? 'text-white/80' : 'text-gray-700'}`}>{folderName}</span>
+            {/* Left: Folder/Album Info */}
+            <div className="flex items-center gap-2">
+                <div
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all border ${
+                        viewMode === 'album' ? '' : 'cursor-pointer'
+                    } ${
+                        theme === 'dark'
+                            ? 'bg-white/5 hover:bg-white/10 border-white/5'
+                            : 'bg-black/5 hover:bg-black/10 border-black/10'
+                    }`}
+                    onClick={viewMode === 'local' ? onOpenFolder : undefined}
+                >
+                    {viewMode === 'album' ? (
+                        <Album size={16} className="text-primary" />
+                    ) : (
+                        <FolderOpen size={16} className="text-primary" />
+                    )}
+                    <span className={`text-xs font-medium max-w-[150px] truncate ${theme === 'dark' ? 'text-white/80' : 'text-gray-700'}`}>{folderName}</span>
+                </div>
+
+                {/* URL Input - Album mode only */}
+                {viewMode === 'album' && selectedAlbum && (
+                    <form onSubmit={handleAddUrl} className="flex items-center gap-1">
+                        <input
+                            type="text"
+                            value={urlInput}
+                            onChange={(e) => setUrlInput(e.target.value)}
+                            onPaste={handlePaste}
+                            placeholder={t('pasteImageUrl')}
+                            className={`w-48 px-2 py-1.5 text-xs rounded-lg transition-colors ${
+                                theme === 'dark'
+                                    ? 'bg-white/5 text-white border border-white/10 placeholder:text-white/30 focus:border-primary/50'
+                                    : 'bg-black/5 text-gray-800 border border-black/10 placeholder:text-gray-400 focus:border-primary/50'
+                            } focus:outline-none`}
+                        />
+                        <button
+                            type="submit"
+                            disabled={!urlInput.trim()}
+                            className="px-2 py-1.5 bg-primary text-white text-xs rounded-lg font-medium hover:bg-primary/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            {t('addImage')}
+                        </button>
+                    </form>
+                )}
             </div>
 
             {/* Center: Main Tools */}

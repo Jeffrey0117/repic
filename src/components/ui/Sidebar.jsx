@@ -6,7 +6,7 @@ const MIN_WIDTH = 80;
 const MAX_WIDTH = 200;
 const DEFAULT_WIDTH = 120;
 
-export const Sidebar = ({ files, currentIndex, onSelect, cacheVersion = 0 }) => {
+export const Sidebar = ({ files, currentIndex, onSelect, cacheVersion = 0, mode = 'local' }) => {
     const [width, setWidth] = useState(() => {
         const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
         if (saved) {
@@ -54,11 +54,18 @@ export const Sidebar = ({ files, currentIndex, onSelect, cacheVersion = 0 }) => 
             <div className="flex-1 overflow-y-auto no-scrollbar py-4 px-2 space-y-3">
                 {files.map((file, index) => {
                     const isActive = index === currentIndex;
-                    const fileName = file.split(/[\\/]/).pop();
+                    // For local mode: file is a path, extract filename
+                    // For web mode: file is a URL or object with url property
+                    const isWeb = mode === 'web';
+                    const fileUrl = isWeb ? (typeof file === 'string' ? file : file.url) : file;
+                    const fileName = isWeb
+                        ? (typeof file === 'string' ? file.split('/').pop()?.split('?')[0] : file.url?.split('/').pop()?.split('?')[0]) || `Image ${index + 1}`
+                        : file.split(/[\\/]/).pop();
+                    const imgSrc = isWeb ? fileUrl : `file://${file}?v=${cacheVersion}`;
 
                     return (
                         <motion.div
-                            key={`${file}-${cacheVersion}`}
+                            key={isWeb ? (typeof file === 'string' ? file : file.id) : `${file}-${cacheVersion}`}
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                             onClick={() => onSelect(index)}
@@ -76,7 +83,7 @@ export const Sidebar = ({ files, currentIndex, onSelect, cacheVersion = 0 }) => 
                                 style={{ width: `${width - 24}px`, height: `${width - 24}px` }}
                             >
                                 <img
-                                    src={`file://${file}?v=${cacheVersion}`}
+                                    src={imgSrc}
                                     alt=""
                                     className="w-full h-full object-contain"
                                     loading="lazy"
