@@ -70,5 +70,15 @@
   "noImageToUpload": "No image to upload",
   "uploadHistory": "Upload History",
   "noUploadHistory": "No uploads yet",
-  "copied": "Copied!"
+  "copied": "Copied!",
+  "webAlbum": "Web Album",
+  "webAlbums": "Web Albums",
+  "newAlbum": "New Album",
+  "albumName": "Album name",
+  "deleteAlbumConfirm": "Delete this album?",
+  "selectOrCreateAlbum": "Select or create an album",
+  "emptyAlbum": "This album is empty",
+  "pasteUrlHint": "Paste image URLs below to add images",
+  "pasteImageUrl": "Paste image URL...",
+  "addImage": "Add"
 }

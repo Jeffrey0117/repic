@@ -70,5 +70,15 @@
   "noImageToUpload": "沒有圖片可上傳",
   "uploadHistory": "上傳歷史",
   "noUploadHistory": "尚無上傳紀錄",
-  "copied": "已複製！"
+  "copied": "已複製！",
+  "webAlbum": "網路相簿",
+  "webAlbums": "網路相簿",
+  "newAlbum": "新增相簿",
+  "albumName": "相簿名稱",
+  "deleteAlbumConfirm": "確定刪除此相簿？",
+  "selectOrCreateAlbum": "選擇或建立一個相簿",
+  "emptyAlbum": "此相簿是空的",
+  "pasteUrlHint": "在下方貼上圖片網址以新增圖片",
+  "pasteImageUrl": "貼上圖片網址...",
+  "addImage": "新增"
 }

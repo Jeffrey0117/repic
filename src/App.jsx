@@ -8,6 +8,7 @@ import { TopBar } from './components/ui/TopBar';
 import { SaveToolbar } from './components/ui/SaveToolbar';
 import { Toast } from './components/ui/Toast';
 import { UploadHistoryPanel } from './components/ui/UploadHistoryPanel';
+import { WebAlbumView } from './components/ui/WebAlbumView';
 import { useFileSystem } from './hooks/useFileSystem';
 import useI18n from './hooks/useI18n';
 
@@ -51,6 +52,9 @@ function App() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadHistory, setUploadHistory] = useState([]);
   const [showUploadHistory, setShowUploadHistory] = useState(false);
+
+  // View mode: 'local' for file system view, 'album' for web album view
+  const [viewMode, setViewMode] = useState('local');
 
   // Sync file system image with local view only when currentImage or cacheVersion changes
   useEffect(() => {
@@ -421,77 +425,91 @@ function App() {
         onToggleUploadHistory={() => setShowUploadHistory(!showUploadHistory)}
         showInfoPanel={showInfoPanel}
         onToggleInfo={() => setShowInfoPanel(!showInfoPanel)}
+        viewMode={viewMode}
+        onToggleViewMode={() => setViewMode(viewMode === 'local' ? 'album' : 'local')}
       />
 
       {/* 2. Main Content Area */}
       <div className="flex-1 overflow-hidden flex">
+        <AnimatePresence mode="wait">
+          {viewMode === 'album' ? (
+            <WebAlbumView key="album-view" />
+          ) : (
+            <motion.div
+              key="local-view"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex-1 flex overflow-hidden"
+            >
+              {/* Left: Thumbnail Explorer */}
+              <Sidebar
+                files={files}
+                currentIndex={currentIndex}
+                cacheVersion={cacheVersion}
+                onSelect={selectImage}
+              />
 
-        {/* Left: Thumbnail Explorer */}
-        <Sidebar
-          files={files}
-          currentIndex={currentIndex}
-          cacheVersion={cacheVersion}
-          onSelect={selectImage}
-        />
+              {/* Center: Main Viewport */}
+              <main className="flex-1 min-w-0 relative main-viewport-bg overflow-hidden transition-all duration-250">
+                <AnimatePresence mode="wait">
+                  {localImage && !isEditing ? (
+                    <motion.div
+                      key="viewer"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="absolute inset-0 z-10 bg-[#0f0f0f]"
+                    >
+                      <div className="w-full h-full p-4">
+                        <ImageViewer src={localImage} />
+                      </div>
+                    </motion.div>
+                  ) : !localImage ? (
+                    <motion.div
+                      key="dropzone"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 0.4 }}
+                      exit={{ opacity: 0 }}
+                      className="absolute inset-4 flex flex-col items-center justify-center"
+                    >
+                      <Dropzone onOpenFolder={handleOpenFile} />
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
 
-        {/* Center: Main Viewport */}
-        <main className="flex-1 min-w-0 relative main-viewport-bg overflow-hidden transition-all duration-250">
-          <AnimatePresence mode="wait">
-            {localImage && !isEditing ? (
-              <motion.div
-                key="viewer"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0 z-10 bg-[#0f0f0f]"
-              >
-                <div className="w-full h-full p-4">
-                  <ImageViewer src={localImage} />
-                </div>
-              </motion.div>
-            ) : !localImage ? (
-              <motion.div
-                key="dropzone"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 0.4 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-4 flex flex-col items-center justify-center"
-              >
-                <Dropzone onOpenFolder={handleOpenFile} />
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
+                {/* Image Cropper - inside main area */}
+                <AnimatePresence>
+                  {localImage && isEditing && (
+                    <motion.div
+                      key="editor"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="absolute inset-0 z-20 bg-black"
+                    >
+                      <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="text-white/60 animate-pulse">Loading editor...</div></div>}>
+                        <ImageCropper
+                          imageSrc={localImage}
+                          onCancel={() => setIsEditing(false)}
+                          onComplete={handleCropComplete}
+                          fileCount={files.length}
+                          onApplyToAll={handleApplyToAll}
+                        />
+                      </Suspense>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </main>
 
-          {/* Image Cropper - inside main area */}
-          <AnimatePresence>
-            {localImage && isEditing && (
-              <motion.div
-                key="editor"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0 z-20 bg-black"
-              >
-                <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="text-white/60 animate-pulse">Loading editor...</div></div>}>
-                  <ImageCropper
-                    imageSrc={localImage}
-                    onCancel={() => setIsEditing(false)}
-                    onComplete={handleCropComplete}
-                    fileCount={files.length}
-                    onApplyToAll={handleApplyToAll}
-                  />
-                </Suspense>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </main>
-
-        {/* Right: Info Panel - flex item with width transition */}
-        <InfoPanel
-          metadata={currentMetadata}
-          isVisible={showInfoPanel && !isEditing}
-        />
-
+              {/* Right: Info Panel - flex item with width transition */}
+              <InfoPanel
+                metadata={currentMetadata}
+                isVisible={showInfoPanel && !isEditing}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Post-Crop Save Toolbar */}

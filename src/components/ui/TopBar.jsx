@@ -10,7 +10,8 @@ import {
     Globe,
     Sun,
     Moon,
-    Layers
+    Layers,
+    Album
 } from '../icons';
 import { Button } from './Button';
 import useI18n from '../../hooks/useI18n';
@@ -19,7 +20,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 // Check if electronAPI is available (injected via preload script)
 const electronAPI = window.electronAPI || null;
 
-export const TopBar = ({ currentPath, onOpenFolder, isEditing, onToggleEdit, onClear, onSave, onUpload, isUploading, uploadHistoryCount, onToggleUploadHistory, showInfoPanel, onToggleInfo }) => {
+export const TopBar = ({ currentPath, onOpenFolder, isEditing, onToggleEdit, onClear, onSave, onUpload, isUploading, uploadHistoryCount, onToggleUploadHistory, showInfoPanel, onToggleInfo, viewMode, onToggleViewMode }) => {
     const { t, language, setLanguage } = useI18n();
     const { theme, toggleTheme } = useTheme();
 
@@ -63,11 +64,13 @@ export const TopBar = ({ currentPath, onOpenFolder, isEditing, onToggleEdit, onC
 
             {/* Center: Main Tools */}
             <div className={`flex items-center rounded-xl p-1 border ${theme === 'dark' ? 'bg-black/20 border-white/5' : 'bg-black/5 border-black/10'}`}>
+                <ToolButton icon={Album} title={t('webAlbum')} onClick={onToggleViewMode} active={viewMode === 'album'} theme={theme} />
+                <div className={`w-px h-6 mx-1 ${theme === 'dark' ? 'bg-white/10' : 'bg-black/10'}`} />
                 <ToolButton icon={RotateCcw} title={t('refresh')} onClick={() => window.location.reload()} theme={theme} />
-                <ToolButton icon={Scissors} title={t('editArea')} onClick={onToggleEdit} active={isEditing} theme={theme} />
-                <ToolButton icon={Upload} title={t('upload')} onClick={onUpload} disabled={isUploading} loading={isUploading} theme={theme} />
+                <ToolButton icon={Scissors} title={t('editArea')} onClick={onToggleEdit} active={isEditing} disabled={viewMode === 'album'} theme={theme} />
+                <ToolButton icon={Upload} title={t('upload')} onClick={onUpload} disabled={isUploading || viewMode === 'album'} loading={isUploading} theme={theme} />
                 <ToolButton icon={Layers} title={t('uploadHistory')} onClick={onToggleUploadHistory} badge={uploadHistoryCount} theme={theme} />
-                <ToolButton icon={Trash2} title={t('delete')} className="text-danger" onClick={onClear} theme={theme} />
+                <ToolButton icon={Trash2} title={t('delete')} className="text-danger" onClick={onClear} disabled={viewMode === 'album'} theme={theme} />
             </div>
 
             {/* Right: Actions */}

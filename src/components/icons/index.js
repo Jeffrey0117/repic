@@ -23,3 +23,4 @@ export { Sun } from './Sun';
 export { Moon } from './Moon';
 export { Upload } from './Upload';
 export { Copy } from './Copy';
+export { Album } from './Album';
