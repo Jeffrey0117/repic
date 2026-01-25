@@ -123,5 +123,14 @@
   "urlInputHint": "Tip: Paste multiple URLs at once, separated by newlines or commas",
   "filePath": "File Path",
   "scraping": "Scraping images...",
-  "imagesAdded": "Added {count} images"
+  "imagesAdded": "Added {count} images",
+  "annotate": "Annotate",
+  "mosaic": "Mosaic",
+  "removeBg": "Remove BG",
+  "compress": "Compress",
+  "quality": "Quality",
+  "estimatedSize": "Estimated size",
+  "cropHint": "Drag to adjust crop area",
+  "removeBgHint": "Automatically remove background",
+  "removeBgNotImplemented": "Remove BG coming soon..."
 }

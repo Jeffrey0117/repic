@@ -16,7 +16,7 @@ import useI18n from './hooks/useI18n';
 import { loadImage, PRIORITY_HIGH } from './utils/imageLoader';
 
 // Lazy load heavy components
-const ImageCropper = lazy(() => import('./features/editor/ImageCropper').then(m => ({ default: m.ImageCropper })));
+const ImageEditor = lazy(() => import('./features/editor/ImageEditor').then(m => ({ default: m.ImageEditor })));
 const BatchCropModal = lazy(() => import('./components/ui/BatchCropModal').then(m => ({ default: m.BatchCropModal })));
 
 // Dynamic getter for electronAPI (injected via preload script)
@@ -994,10 +994,31 @@ function App() {
 
       console.log('[handleUpload] Blob created, size:', blob.size, 'type:', blob.type);
 
+      // Convert WebP to PNG for better social media compatibility
+      let uploadBlob = blob;
+      if (blob.type === 'image/webp') {
+        console.log('[handleUpload] Converting WebP to PNG...');
+        const img = new Image();
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+          img.src = URL.createObjectURL(blob);
+        });
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        URL.revokeObjectURL(img.src);
+        uploadBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+        console.log('[handleUpload] Converted to PNG, size:', uploadBlob.size);
+      }
+
       // Create form data
       const formData = new FormData();
-      const filename = `repic-${Date.now()}.${blob.type.split('/')[1] || 'png'}`;
-      formData.append('file', blob, filename);
+      const ext = uploadBlob.type === 'image/png' ? 'png' : (uploadBlob.type.split('/')[1] || 'png');
+      const filename = `repic-${Date.now()}.${ext}`;
+      formData.append('file', uploadBlob, filename);
 
       console.log('[handleUpload] Uploading to urusai.cc...');
 
@@ -1443,7 +1464,7 @@ function App() {
                 className="absolute inset-0 z-20 bg-black"
               >
                 <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="text-white/60 animate-pulse">Loading editor...</div></div>}>
-                  <ImageCropper
+                  <ImageEditor
                     imageSrc={viewMode === 'album' ? currentAlbumImage : localImage}
                     onCancel={() => setIsEditing(false)}
                     onComplete={handleCropComplete}

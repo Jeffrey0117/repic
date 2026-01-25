@@ -105,6 +105,72 @@ export function drawBlur(ctx, annotation, image = null) {
 }
 
 /**
+ * Draw a mosaic/pixelate annotation
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {Object} annotation - Annotation object with x, y, width, height
+ * @param {HTMLImageElement|null} image - Image element for actual mosaic (null for preview)
+ * @param {number} pixelSize - Size of mosaic blocks (default 10)
+ */
+export function drawMosaic(ctx, annotation, image = null, pixelSize = 10) {
+    const { x, y, width, height } = annotation;
+
+    if (image) {
+        // Export mode: apply actual mosaic effect
+        ctx.save();
+
+        // Get the region from the image
+        const scaleX = image.naturalWidth / ctx.canvas.width;
+        const scaleY = image.naturalHeight / ctx.canvas.height;
+        const srcX = x * scaleX;
+        const srcY = y * scaleY;
+        const srcW = width * scaleX;
+        const srcH = height * scaleY;
+
+        // Create temp canvas for pixelation
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+
+        // Draw at small size then scale up for pixelation
+        const smallW = Math.max(1, Math.floor(Math.abs(srcW) / pixelSize));
+        const smallH = Math.max(1, Math.floor(Math.abs(srcH) / pixelSize));
+        tempCanvas.width = smallW;
+        tempCanvas.height = smallH;
+
+        tempCtx.drawImage(image, srcX, srcY, srcW, srcH, 0, 0, smallW, smallH);
+
+        // Draw back scaled up with pixelation
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(tempCanvas, 0, 0, smallW, smallH, x, y, width, height);
+        ctx.imageSmoothingEnabled = true;
+
+        ctx.restore();
+    } else {
+        // Preview mode: draw grid pattern
+        ctx.fillStyle = 'rgba(128, 128, 128, 0.5)';
+        ctx.fillRect(x, y, width, height);
+
+        // Draw grid lines for preview
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.lineWidth = 1;
+        const gridSize = 8;
+        for (let gx = x; gx < x + width; gx += gridSize) {
+            ctx.beginPath();
+            ctx.moveTo(gx, y);
+            ctx.lineTo(gx, y + height);
+            ctx.stroke();
+        }
+        for (let gy = y; gy < y + height; gy += gridSize) {
+            ctx.beginPath();
+            ctx.moveTo(x, gy);
+            ctx.lineTo(x + width, gy);
+            ctx.stroke();
+        }
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.strokeRect(x, y, width, height);
+    }
+}
+
+/**
  * Draw any annotation based on its type
  * @param {CanvasRenderingContext2D} ctx - Canvas context
  * @param {Object} annotation - Annotation object with type, x, y, width, height
@@ -130,6 +196,9 @@ export function drawAnnotation(ctx, annotation, options = {}) {
             break;
         case 'blur':
             drawBlur(ctx, annotation, image);
+            break;
+        case 'mosaic':
+            drawMosaic(ctx, annotation, image);
             break;
         default:
             console.warn(`Unknown annotation type: ${annotation.type}`);

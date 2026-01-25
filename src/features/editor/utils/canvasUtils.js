@@ -2,12 +2,14 @@ import { drawAnnotation } from './drawingHelpers.js';
 
 // Processes crop data from Cropper component
 // crop: { x, y, width, height } in pixels
+// quality: 1-100 for JPEG compression (default 95)
 export default async function getCroppedImg(
     image,
     crop,
     rotate = 0,
     scale = 1,
-    annotations = []
+    annotations = [],
+    quality = 95
 ) {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -71,13 +73,15 @@ export default async function getCroppedImg(
 
         drawAnnotation(ctx, scaledAnnotation, {
             scale: scaleX,
-            image: ann.type === 'blur' ? image : null
+            image: (ann.type === 'blur' || ann.type === 'mosaic') ? image : null
         });
     });
 
     ctx.restore();
 
     return new Promise((resolve) => {
-        resolve(canvas.toDataURL('image/jpeg', 0.95)); // High quality jpeg
+        // Use quality parameter (convert 1-100 to 0-1)
+        const q = Math.max(0.1, Math.min(1, quality / 100));
+        resolve(canvas.toDataURL('image/jpeg', q));
     });
 }

@@ -123,5 +123,14 @@
   "urlInputHint": "提示：可一次貼上多個網址，用換行或逗號分隔",
   "filePath": "檔案路徑",
   "scraping": "正在抓取圖片...",
-  "imagesAdded": "已加入 {count} 張圖片"
+  "imagesAdded": "已加入 {count} 張圖片",
+  "annotate": "標註",
+  "mosaic": "馬賽克",
+  "removeBg": "去背",
+  "compress": "壓縮",
+  "quality": "品質",
+  "estimatedSize": "預估大小",
+  "cropHint": "拖動調整裁切區域",
+  "removeBgHint": "自動移除圖片背景",
+  "removeBgNotImplemented": "去背功能開發中..."
 }
