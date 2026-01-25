@@ -80,6 +80,7 @@
   "emptyAlbum": "This album is empty",
   "pasteUrlHint": "Paste image URLs below to add images",
   "pasteImageUrl": "Paste image URL...",
+  "pasteOrEnter": "Paste URL or press Enter to add",
   "addImage": "Add",
   "downloadSuccess": "Downloaded successfully!",
   "downloadFailed": "Download failed: {error}",

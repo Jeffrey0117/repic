@@ -661,12 +661,41 @@ function App() {
                 <motion.div
                   key="album-empty"
                   initial={{ opacity: 0 }}
-                  animate={{ opacity: 0.4 }}
+                  animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="absolute inset-4 flex flex-col items-center justify-center text-white/40"
+                  className="absolute inset-4 flex flex-col items-center justify-center"
                 >
-                  <p className="text-lg">{selectedAlbum ? t('emptyAlbum') : t('selectOrCreateAlbum')}</p>
-                  {selectedAlbum && <p className="text-sm mt-2">{t('pasteUrlHint')}</p>}
+                  <p className="text-lg text-white/40">{selectedAlbum ? t('emptyAlbum') : t('selectOrCreateAlbum')}</p>
+                  {selectedAlbum && (
+                    <>
+                      <p className="text-sm mt-2 text-white/40">{t('pasteUrlHint')}</p>
+                      <div className="mt-6 w-full max-w-md">
+                        <input
+                          type="text"
+                          placeholder={t('pasteImageUrl')}
+                          className="w-full px-4 py-3 text-sm rounded-xl bg-white/5 text-white border border-white/10 placeholder:text-white/30 focus:border-primary/50 focus:outline-none"
+                          onPaste={(e) => {
+                            const text = e.clipboardData.getData('text');
+                            if (text) {
+                              const urls = text.split(/[\n,]/).map(u => u.trim()).filter(Boolean);
+                              if (urls.length > 0 && urls.every(url => url.startsWith('http'))) {
+                                e.preventDefault();
+                                urls.forEach(url => selectedAlbumId && addAlbumImage(selectedAlbumId, url));
+                              }
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && e.target.value.trim()) {
+                              const urls = e.target.value.split(/[\n,]/).map(u => u.trim()).filter(Boolean);
+                              urls.forEach(url => selectedAlbumId && addAlbumImage(selectedAlbumId, url));
+                              e.target.value = '';
+                            }
+                          }}
+                        />
+                        <p className="text-xs text-white/30 mt-2 text-center">{t('pasteOrEnter')}</p>
+                      </div>
+                    </>
+                  )}
                 </motion.div>
               )
             ) : (
