@@ -215,6 +215,7 @@ export const useFileSystem = () => {
         selectImage,
         currentPath,
         currentMetadata,
-        cacheVersion
+        cacheVersion,
+        setCacheVersion
     };
 };

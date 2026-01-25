@@ -191,7 +191,7 @@ export const Sidebar = ({
 
     return (
         <div
-            className={`bg-surface/30 backdrop-blur-xl overflow-hidden relative ${
+            className={`bg-surface/30 backdrop-blur-xl overflow-hidden relative transition-all duration-300 ease-out ${
                 isHorizontal
                     ? 'w-full border-t border-white/5 flex flex-row'
                     : 'h-full border-r border-white/5 flex flex-col'

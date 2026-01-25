@@ -22,7 +22,9 @@ export const ImageViewer = ({ src, crop }) => {
         setPosition({ x: 0, y: 0 });
         setProxiedSrc(null);
         setLoadFailed(false);
-        setIsLoading(true);
+        // Only show loading for web images, local files load fast
+        const isLocalFile = src?.startsWith('file://') || src?.startsWith('data:');
+        setIsLoading(!isLocalFile);
     }, [src]);
 
     // Actual image source (use proxied if available)

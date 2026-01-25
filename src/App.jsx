@@ -34,7 +34,8 @@ function App() {
     currentIndex,
     currentPath,
     currentMetadata,
-    cacheVersion
+    cacheVersion,
+    setCacheVersion
   } = useFileSystem();
 
   // Web album hook
@@ -1129,9 +1130,9 @@ function App() {
       />
 
       {/* 2. Main Content Area */}
-      <div className={`flex-1 overflow-hidden flex ${sidebarPosition === 'bottom' ? 'flex-col' : ''}`}>
-        {/* Upper row: AlbumSidebar + (Sidebar if left) + main + InfoPanel */}
-        <div className={`${sidebarPosition === 'bottom' ? 'flex-1 overflow-hidden' : 'contents'} flex`}>
+      <div className={`flex-1 overflow-hidden flex transition-all duration-300 ${sidebarPosition === 'bottom' ? 'flex-col' : 'flex-row'}`}>
+        {/* Horizontal row: AlbumSidebar + (Sidebar if left) + main + InfoPanel */}
+        <div className="flex flex-row flex-1 min-h-0 overflow-hidden">
           {/* Album Sidebar - only in album mode */}
           {viewMode === 'album' && (
             <AlbumSidebar
@@ -1177,7 +1178,7 @@ function App() {
 
         {/* Center: Main Viewport */}
         <main
-          className={`flex-1 min-w-0 relative main-viewport-bg overflow-hidden transition-all duration-250 ${
+          className={`flex-1 min-w-0 min-h-0 relative main-viewport-bg overflow-hidden transition-all duration-300 ${
             isDragOver && viewMode === 'album' ? 'ring-4 ring-primary/50 ring-inset' : ''
           }`}
           onDragOver={handleDragOver}
