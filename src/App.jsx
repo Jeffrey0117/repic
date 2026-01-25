@@ -296,10 +296,10 @@ function App() {
     if (imageUrl && imageUrl.startsWith('http')) {
       addAlbumImage(selectedAlbumId, imageUrl);
       // Jump to the newly added image (it's at the end)
-      setAlbumImageIndex(albumImages.length);
+      setAlbumImageIndex(selectedAlbum?.images?.length || 0);
       setToast({ visible: true, message: t('imageAdded') || 'Image added!' });
     }
-  }, [viewMode, selectedAlbumId, addAlbumImage, albumImages.length, t]);
+  }, [viewMode, selectedAlbumId, addAlbumImage, selectedAlbum?.images?.length, t]);
 
   const handleCropComplete = async (result) => {
     // Check if this is a virtual image crop (returns crop params instead of image)
@@ -1079,7 +1079,7 @@ function App() {
                 const imageUrl = result.data.url_direct || result.data.url_preview;
                 addAlbumImage(selectedAlbumId, imageUrl);
                 // Jump to newly added image
-                setAlbumImageIndex(albumImages.length);
+                setAlbumImageIndex(selectedAlbum?.images?.length || 0);
                 setToast({ visible: true, message: t('imageAdded') });
               }
             } catch (err) {
@@ -1104,7 +1104,7 @@ function App() {
         if (urls.length > 0 && viewMode === 'album' && selectedAlbumId) {
           e.preventDefault();
           // Jump to first newly added image
-          const newIndex = albumImages.length;
+          const newIndex = selectedAlbum?.images?.length || 0;
           urls.forEach(url => addAlbumImage(selectedAlbumId, url));
           setAlbumImageIndex(newIndex);
           setToast({ visible: true, message: t('imageAdded') });
@@ -1114,7 +1114,7 @@ function App() {
 
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
-  }, [isEditing, viewMode, selectedAlbumId, addAlbumImage, albumImages.length, t]);
+  }, [isEditing, viewMode, selectedAlbumId, addAlbumImage, selectedAlbum?.images?.length, t]);
 
   return (
     <div
