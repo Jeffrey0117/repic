@@ -1,5 +1,5 @@
-import { memo } from 'react';
-import { Info, BarChart3, Database, Calendar, Globe, Album } from '../icons';
+import { memo, useState, useCallback } from 'react';
+import { Info, BarChart3, Database, Calendar, Globe, Album, Copy } from '../icons';
 import useI18n from '../../hooks/useI18n';
 
 // Panel width constant for consistency
@@ -15,6 +15,44 @@ const Link = ({ size = 24, className = '' }) => (
         <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
     </svg>
 );
+
+// Folder icon
+const Folder = ({ size = 24, className = '' }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+    </svg>
+);
+
+// Copy button component
+const CopyButton = memo(function CopyButton({ text, className = '' }) {
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = useCallback(async () => {
+        try {
+            await navigator.clipboard.writeText(text);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+        } catch (err) {
+            console.error('Failed to copy:', err);
+        }
+    }, [text]);
+
+    return (
+        <button
+            onClick={handleCopy}
+            className={`p-1 rounded hover:bg-white/10 transition-colors ${className}`}
+            title={copied ? '已複製' : '複製'}
+        >
+            {copied ? (
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-400">
+                    <polyline points="20 6 9 17 4 12" />
+                </svg>
+            ) : (
+                <Copy size={14} className="text-white/50 hover:text-white/80" />
+            )}
+        </button>
+    );
+});
 
 export const InfoPanel = memo(function InfoPanel({ metadata, isVisible = true, mode = 'local' }) {
     const { t, language } = useI18n();
@@ -83,17 +121,20 @@ export const InfoPanel = memo(function InfoPanel({ metadata, isVisible = true, m
                                         icon={<Link size={16} />}
                                         label={t('imageUrl')}
                                         value={
-                                            <a
-                                                href={metadata.url}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-primary hover:underline break-all text-xs"
-                                                title={metadata.url}
-                                            >
-                                                {metadata.url?.length > 50
-                                                    ? metadata.url.substring(0, 50) + '...'
-                                                    : metadata.url}
-                                            </a>
+                                            <div className="flex items-start gap-1">
+                                                <a
+                                                    href={metadata.url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-primary hover:underline break-all text-xs flex-1"
+                                                    title={metadata.url}
+                                                >
+                                                    {metadata.url?.length > 40
+                                                        ? metadata.url.substring(0, 40) + '...'
+                                                        : metadata.url}
+                                                </a>
+                                                <CopyButton text={metadata.url} />
+                                            </div>
                                         }
                                     />
 
@@ -112,6 +153,21 @@ export const InfoPanel = memo(function InfoPanel({ metadata, isVisible = true, m
                             ) : (
                                 <>
                                     {/* Local file info */}
+                                    <InfoItem
+                                        icon={<Folder size={16} />}
+                                        label={t('filePath')}
+                                        value={
+                                            <div className="flex items-start gap-1">
+                                                <span className="break-all text-xs flex-1" title={metadata.filePath}>
+                                                    {metadata.filePath?.length > 40
+                                                        ? '...' + metadata.filePath.slice(-40)
+                                                        : metadata.filePath}
+                                                </span>
+                                                <CopyButton text={metadata.filePath} />
+                                            </div>
+                                        }
+                                    />
+
                                     <InfoItem
                                         icon={<BarChart3 size={16} />}
                                         label={t('imageResolution')}

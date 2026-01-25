@@ -120,5 +120,6 @@
   "addUrl": "新增網址",
   "addImageUrl": "新增圖片網址",
   "pasteImageUrlPlaceholder": "在此貼上圖片網址...\n支援多個網址（每行一個或用逗號分隔）",
-  "urlInputHint": "提示：可一次貼上多個網址，用換行或逗號分隔"
+  "urlInputHint": "提示：可一次貼上多個網址，用換行或逗號分隔",
+  "filePath": "檔案路徑"
 }

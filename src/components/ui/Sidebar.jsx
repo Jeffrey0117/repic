@@ -357,14 +357,6 @@ export const Sidebar = ({
                                 >
                                     ↑
                                 </button>
-                                <button
-                                    onClick={onDeleteSelected}
-                                    disabled={selectedIds.size === 0}
-                                    className="text-[10px] text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-red-500/20 disabled:opacity-30 disabled:cursor-not-allowed"
-                                    title="刪除"
-                                >
-                                    ✕
-                                </button>
                             </div>
                         </div>
                     ) : isReorderMode ? (

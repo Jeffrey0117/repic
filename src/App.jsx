@@ -1201,6 +1201,9 @@ function App() {
           setSidebarPosition(newPos);
           localStorage.setItem('repic-sidebar-position', newPos);
         }}
+        isMultiSelectMode={viewMode === 'album' && isMultiSelectMode}
+        selectedImageIds={selectedImageIds}
+        onDeleteSelected={handleBatchDelete}
       />
 
       {/* 2. Main Content Area */}
@@ -1417,7 +1420,7 @@ function App() {
                 index: safeAlbumIndex,
                 total: albumImages.length
               } : null)
-            : currentMetadata
+            : (currentMetadata ? { ...currentMetadata, filePath: currentImage } : null)
           }
           isVisible={showInfoPanel && !isEditing}
           mode={viewMode === 'album' ? 'web' : 'local'}
