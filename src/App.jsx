@@ -13,6 +13,7 @@ import { AlbumSidebar } from './features/album/AlbumSidebar';
 import { useFileSystem } from './hooks/useFileSystem';
 import { useWebAlbums } from './hooks/useWebAlbums';
 import useI18n from './hooks/useI18n';
+import { loadImage, PRIORITY_HIGH } from './utils/imageLoader';
 
 // Lazy load heavy components
 const ImageCropper = lazy(() => import('./features/editor/ImageCropper').then(m => ({ default: m.ImageCropper })));
@@ -294,6 +295,8 @@ function App() {
 
     // Add the image to the album if we found a valid URL
     if (imageUrl && imageUrl.startsWith('http')) {
+      // Start loading immediately (generates thumbnail in background)
+      loadImage(imageUrl, PRIORITY_HIGH).catch(() => {});
       addAlbumImage(selectedAlbumId, imageUrl);
       // Jump to the newly added image (it's at the end)
       setAlbumImageIndex(selectedAlbum?.images?.length || 0);
@@ -1103,6 +1106,8 @@ function App() {
         const urls = text.split(/[\n,]/).map(u => u.trim()).filter(u => u.startsWith('http'));
         if (urls.length > 0 && viewMode === 'album' && selectedAlbumId) {
           e.preventDefault();
+          // Preload all images immediately (generates thumbnails in background)
+          urls.forEach(url => loadImage(url, PRIORITY_HIGH).catch(() => {}));
           // Jump to first newly added image
           const newIndex = selectedAlbum?.images?.length || 0;
           urls.forEach(url => addAlbumImage(selectedAlbumId, url));
@@ -1186,6 +1191,8 @@ function App() {
         selectedAlbum={selectedAlbum}
         onAddAlbumImage={(url) => {
           if (selectedAlbumId) {
+            // Preload immediately (generates thumbnail in background)
+            loadImage(url, PRIORITY_HIGH).catch(() => {});
             addAlbumImage(selectedAlbumId, url);
             // Jump to newly added image
             setAlbumImageIndex(albumImages.length);
