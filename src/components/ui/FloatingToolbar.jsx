@@ -45,23 +45,18 @@ export const FloatingToolbar = ({
   const timeoutRef = useRef(null);
   const toolbarRef = useRef(null);
 
-  // Auto-hide logic
+  // Auto-hide logic - show near bottom, hide when leave toolbar
   useEffect(() => {
     const handleMouseMove = (e) => {
-      // Show when near the bottom of the screen (80px zone)
-      const isNearBottom = window.innerHeight - e.clientY < 80;
+      // Show when near the bottom of the screen (60px zone)
+      const isNearBottom = window.innerHeight - e.clientY < 60;
 
       if (isNearBottom || isHovered) {
         setIsVisible(true);
         clearTimeout(timeoutRef.current);
-      } else {
-        // Start hide timer (1.5s)
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = setTimeout(() => {
-          if (!isHovered) {
-            setIsVisible(false);
-          }
-        }, 1500);
+      } else if (!isHovered) {
+        // Hide immediately
+        setIsVisible(false);
       }
     };
 
@@ -90,25 +85,30 @@ export const FloatingToolbar = ({
 
   return (
     <AnimatePresence>
-      <motion.div
-        ref={toolbarRef}
-        initial={{ y: 20, opacity: 0 }}
-        animate={{
-          y: isVisible ? 0 : 20,
-          opacity: isVisible ? 1 : 0
-        }}
-        transition={{ duration: 0.2, ease: 'easeOut' }}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-2 py-1.5 rounded-2xl border shadow-2xl backdrop-blur-xl ${
-          isDark
-            ? 'bg-black/70 border-white/10'
-            : 'bg-white/80 border-black/10'
-        }`}
-        style={{
-          pointerEvents: isVisible ? 'auto' : 'none'
-        }}
-      >
+      {isVisible && (
+        <motion.div
+          ref={toolbarRef}
+          initial={{ y: 16, opacity: 0, scale: 0.92 }}
+          animate={{
+            y: 0,
+            opacity: 1,
+            scale: 1,
+            transition: { type: 'spring', stiffness: 400, damping: 28 }
+          }}
+          exit={{
+            y: 8,
+            opacity: 0,
+            scale: 0.96,
+            transition: { duration: 0.1, ease: 'easeIn' }
+          }}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-2 py-1.5 rounded-2xl border shadow-2xl backdrop-blur-xl ${
+            isDark
+              ? 'bg-black/70 border-white/10'
+              : 'bg-white/80 border-black/10'
+          }`}
+        >
         <div className="flex items-center gap-0.5">
           <ToolButton
             icon={RotateCcw}
@@ -184,7 +184,8 @@ export const FloatingToolbar = ({
             theme={theme}
           />
         </div>
-      </motion.div>
+        </motion.div>
+      )}
     </AnimatePresence>
   );
 };
