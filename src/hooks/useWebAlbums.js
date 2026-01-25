@@ -168,6 +168,64 @@ export const useWebAlbums = () => {
     setSelectedAlbumId(albumId);
   }, []);
 
+  // Reorder images in album (drag and drop)
+  const reorderImages = useCallback((albumId, fromIndex, toIndex) => {
+    if (fromIndex === toIndex) return;
+
+    setAlbums(prev => prev.map(album => {
+      if (album.id !== albumId) return album;
+
+      const images = [...album.images];
+      const [removed] = images.splice(fromIndex, 1);
+      images.splice(toIndex, 0, removed);
+
+      return { ...album, images };
+    }));
+  }, []);
+
+  // Export all albums to JSON
+  const exportAlbums = useCallback(() => {
+    const data = {
+      version: 1,
+      exportedAt: Date.now(),
+      albums
+    };
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `repic-albums-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [albums]);
+
+  // Import albums from JSON
+  const importAlbums = useCallback((jsonData, mode = 'merge') => {
+    try {
+      const data = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
+      if (!data.albums || !Array.isArray(data.albums)) {
+        throw new Error('Invalid format');
+      }
+
+      if (mode === 'replace') {
+        setAlbums(data.albums);
+        setSelectedAlbumId(data.albums.length > 0 ? data.albums[0].id : null);
+      } else {
+        // Merge: add albums that don't exist by name
+        setAlbums(prev => {
+          const existingNames = new Set(prev.map(a => a.name));
+          const newAlbums = data.albums.filter(a => !existingNames.has(a.name));
+          return [...prev, ...newAlbums];
+        });
+      }
+      return { success: true, count: data.albums.length };
+    } catch (e) {
+      console.error('[importAlbums] Error:', e);
+      return { success: false, error: e.message };
+    }
+  }, []);
+
   return {
     albums,
     selectedAlbum,
@@ -180,7 +238,10 @@ export const useWebAlbums = () => {
     addImages,
     removeImage,
     updateImageCrop,
-    clearImageCrop
+    clearImageCrop,
+    reorderImages,
+    exportAlbums,
+    importAlbums
   };
 };
 

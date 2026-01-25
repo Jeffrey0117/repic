@@ -14,6 +14,8 @@ export const AlbumSidebar = ({
   onCreateAlbum,
   onRenameAlbum,
   onDeleteAlbum,
+  onExportAlbums,
+  onImportAlbums,
   isVisible = true
 }) => {
   const { t } = useI18n();
@@ -85,6 +87,35 @@ export const AlbumSidebar = ({
           <h2 className={`text-sm font-semibold ${theme === 'dark' ? 'text-white/80' : 'text-gray-700'}`}>
             {t('webAlbums')}
           </h2>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={onExportAlbums}
+              title="匯出"
+              className={`p-1.5 rounded text-[10px] ${theme === 'dark' ? 'hover:bg-white/10 text-white/50' : 'hover:bg-gray-200 text-gray-500'}`}
+            >
+              ↓
+            </button>
+            <label
+              title="匯入"
+              className={`p-1.5 rounded text-[10px] cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10 text-white/50' : 'hover:bg-gray-200 text-gray-500'}`}
+            >
+              ↑
+              <input
+                type="file"
+                accept=".json"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onload = () => onImportAlbums(reader.result);
+                    reader.readAsText(file);
+                    e.target.value = '';
+                  }
+                }}
+              />
+            </label>
+          </div>
         </div>
 
         {/* Album List */}

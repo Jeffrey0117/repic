@@ -25,10 +25,16 @@ export const Sidebar = ({
     onToggleSelect,
     onEnterMultiSelect,
     onExitMultiSelect,
-    onDeleteSelected
+    onDeleteSelected,
+    onDownloadSelected,
+    onUploadSelected,
+    onReorder
 }) => {
     // Cache for .repic file data (url + crop)
     const [repicData, setRepicData] = useState({});
+    // Drag reorder state
+    const [dragIndex, setDragIndex] = useState(null);
+    const [dragOverIndex, setDragOverIndex] = useState(null);
     // Cache for proxied images (when direct load fails)
     const [proxiedUrls, setProxiedUrls] = useState({});
     // Track failed images (after proxy also failed)
@@ -108,23 +114,44 @@ export const Sidebar = ({
             {mode === 'web' && (
                 <div className="flex-shrink-0 px-2 py-2 border-b border-white/5">
                     {isMultiSelectMode ? (
-                        <div className="flex items-center justify-between gap-1">
-                            <button
-                                onClick={onExitMultiSelect}
-                                className="text-[10px] text-white/60 hover:text-white px-2 py-1 rounded hover:bg-white/10"
-                            >
-                                ✕
-                            </button>
-                            <span className="text-[10px] text-white/60">
-                                {selectedIds.size} 選中
-                            </span>
-                            <button
-                                onClick={onDeleteSelected}
-                                disabled={selectedIds.size === 0}
-                                className="text-[10px] text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-red-500/20 disabled:opacity-30 disabled:cursor-not-allowed"
-                            >
-                                刪除
-                            </button>
+                        <div className="flex flex-col gap-1">
+                            <div className="flex items-center justify-between">
+                                <button
+                                    onClick={onExitMultiSelect}
+                                    className="text-[10px] text-white/60 hover:text-white px-2 py-1 rounded hover:bg-white/10"
+                                >
+                                    ✕
+                                </button>
+                                <span className="text-[10px] text-white/60">
+                                    {selectedIds.size} 選中
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <button
+                                    onClick={onDownloadSelected}
+                                    disabled={selectedIds.size === 0}
+                                    className="flex-1 text-[10px] text-blue-400 hover:text-blue-300 px-1 py-1 rounded hover:bg-blue-500/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                                    title="下載"
+                                >
+                                    ↓
+                                </button>
+                                <button
+                                    onClick={onUploadSelected}
+                                    disabled={selectedIds.size === 0}
+                                    className="flex-1 text-[10px] text-green-400 hover:text-green-300 px-1 py-1 rounded hover:bg-green-500/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                                    title="上傳"
+                                >
+                                    ↑
+                                </button>
+                                <button
+                                    onClick={onDeleteSelected}
+                                    disabled={selectedIds.size === 0}
+                                    className="flex-1 text-[10px] text-red-400 hover:text-red-300 px-1 py-1 rounded hover:bg-red-500/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                                    title="刪除"
+                                >
+                                    ✕
+                                </button>
+                            </div>
                         </div>
                     ) : (
                         <button
@@ -177,20 +204,54 @@ export const Sidebar = ({
                     const imageId = isWeb && typeof file === 'object' ? file.id : null;
                     const isSelected = imageId && selectedIds.has(imageId);
 
+                    // Drag reorder handlers (for album mode)
+                    const canReorder = isWeb && onReorder && !isMultiSelectMode;
+                    const isDragging = dragIndex === index;
+                    const isDragOver = dragOverIndex === index;
+
                     return (
                         <motion.div
                             key={isWeb ? (typeof file === 'string' ? file : file.id) : `${file}-${cacheVersion}`}
-                            whileHover={{ scale: isMultiSelectMode ? 1 : 1.05 }}
+                            whileHover={{ scale: isMultiSelectMode || isDragging ? 1 : 1.05 }}
                             whileTap={{ scale: isMultiSelectMode ? 1 : 0.95 }}
                             onClick={() => {
                                 if (isMultiSelectMode && imageId) {
                                     onToggleSelect(imageId);
-                                } else {
-                                    console.log('[Sidebar] Clicked index:', index, 'file:', file, 'fileName:', fileName);
+                                } else if (!isDragging) {
                                     onSelect(index);
                                 }
                             }}
-                            className={`relative cursor-pointer group flex flex-col items-center`}
+                            draggable={canReorder}
+                            onDragStart={(e) => {
+                                if (canReorder) {
+                                    setDragIndex(index);
+                                    e.dataTransfer.effectAllowed = 'move';
+                                }
+                            }}
+                            onDragOver={(e) => {
+                                if (canReorder && dragIndex !== null && dragIndex !== index) {
+                                    e.preventDefault();
+                                    setDragOverIndex(index);
+                                }
+                            }}
+                            onDragLeave={() => {
+                                if (canReorder) {
+                                    setDragOverIndex(null);
+                                }
+                            }}
+                            onDrop={(e) => {
+                                if (canReorder && dragIndex !== null && dragIndex !== index) {
+                                    e.preventDefault();
+                                    onReorder(dragIndex, index);
+                                    setDragIndex(null);
+                                    setDragOverIndex(null);
+                                }
+                            }}
+                            onDragEnd={() => {
+                                setDragIndex(null);
+                                setDragOverIndex(null);
+                            }}
+                            className={`relative cursor-pointer group flex flex-col items-center ${isDragging ? 'opacity-50' : ''} ${isDragOver ? 'scale-110' : ''}`}
                         >
                             <div className="text-[10px] text-white/40 truncate w-full mb-1 text-center group-hover:text-white/80 transition-colors">
                                 {index + 1}
@@ -200,14 +261,17 @@ export const Sidebar = ({
                                 className={`
                                     rounded-lg overflow-hidden border-2 transition-all duration-200 shadow-lg bg-black/50 relative
                                     ${isSelected ? 'border-green-500 ring-2 ring-green-500/30' : isActive ? 'border-primary ring-2 ring-primary/20 scale-105' : 'border-transparent group-hover:border-white/30'}
+                                    ${isDragOver ? 'border-primary border-dashed' : ''}
                                 `}
                                 style={{ width: `${width - 24}px`, height: `${width - 24}px` }}
-                                draggable={!isMultiSelectMode}
+                                draggable={!isMultiSelectMode && !canReorder}
                                 onDragStart={(e) => {
-                                    e.preventDefault();
-                                    // Use Electron's native drag for system-level drag
-                                    if (electronAPI?.startDrag) {
-                                        electronAPI.startDrag(imgSrc, fileName);
+                                    if (!canReorder) {
+                                        e.preventDefault();
+                                        // Use Electron's native drag for system-level drag
+                                        if (electronAPI?.startDrag) {
+                                            electronAPI.startDrag(imgSrc, fileName);
+                                        }
                                     }
                                 }}
                             >

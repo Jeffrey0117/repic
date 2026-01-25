@@ -48,7 +48,10 @@ function App() {
     deleteAlbum,
     addImage: addAlbumImage,
     removeImage: removeAlbumImage,
-    updateImageCrop
+    updateImageCrop,
+    reorderImages,
+    exportAlbums,
+    importAlbums
   } = useWebAlbums();
 
   // Album image navigation state
@@ -544,6 +547,130 @@ function App() {
     setIsMultiSelectMode(false);
   }, []);
 
+  // Batch download selected images
+  const handleBatchDownload = useCallback(async () => {
+    if (selectedImageIds.size === 0 || !selectedAlbum) return;
+
+    const electronAPI = getElectronAPI();
+    if (!electronAPI) return;
+
+    // Select folder to save
+    const folder = await electronAPI.selectDirectory();
+    if (!folder) return;
+
+    const selectedImages = selectedAlbum.images.filter(img => selectedImageIds.has(img.id));
+    let successCount = 0;
+    let failCount = 0;
+
+    setToast({ visible: true, message: t('processing') });
+
+    for (let i = 0; i < selectedImages.length; i++) {
+      const img = selectedImages[i];
+      try {
+        // Fetch image
+        const response = await fetch(img.url);
+        if (!response.ok) throw new Error('Fetch failed');
+        const blob = await response.blob();
+
+        // Convert to base64
+        const reader = new FileReader();
+        const base64 = await new Promise((resolve, reject) => {
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+
+        // Generate filename
+        const urlFilename = img.url.split('/').pop()?.split('?')[0] || `image-${i + 1}`;
+        const ext = blob.type.split('/')[1] || 'png';
+        const filename = urlFilename.includes('.') ? urlFilename : `${urlFilename}.${ext}`;
+        const filePath = electronAPI.path.join(folder, filename);
+
+        // Save file
+        const result = await electronAPI.saveFile(filePath, base64);
+        if (result.success) {
+          successCount++;
+        } else {
+          failCount++;
+        }
+      } catch (err) {
+        console.error('[BatchDownload] Failed:', img.url, err);
+        failCount++;
+      }
+    }
+
+    // Show result
+    if (failCount > 0) {
+      setToast({ visible: true, message: t('completedMessage', { success: successCount, failed: failCount }) });
+    } else {
+      setToast({ visible: true, message: t('downloadSuccess') + ` (${successCount})` });
+    }
+
+    // Exit multi-select
+    setSelectedImageIds(new Set());
+    setIsMultiSelectMode(false);
+  }, [selectedImageIds, selectedAlbum, t]);
+
+  // Batch upload selected images to cloud
+  const handleBatchUpload = useCallback(async () => {
+    if (selectedImageIds.size === 0 || !selectedAlbum) return;
+
+    const selectedImages = selectedAlbum.images.filter(img => selectedImageIds.has(img.id));
+    const uploadedUrls = [];
+    let failCount = 0;
+
+    setToast({ visible: true, message: t('uploading') });
+
+    for (const img of selectedImages) {
+      try {
+        // Fetch image
+        const response = await fetch(img.url);
+        if (!response.ok) throw new Error('Fetch failed');
+        const blob = await response.blob();
+
+        // Upload to urusai.cc
+        const formData = new FormData();
+        const filename = img.url.split('/').pop()?.split('?')[0] || `image-${Date.now()}.png`;
+        formData.append('file', blob, filename);
+
+        const uploadRes = await fetch('https://api.urusai.cc/v1/upload', {
+          method: 'POST',
+          body: formData
+        });
+        const result = await uploadRes.json();
+
+        if (result.status === 'success' && result.data) {
+          const imageUrl = result.data.url_direct || result.data.url_preview;
+          uploadedUrls.push(imageUrl);
+        } else {
+          failCount++;
+        }
+      } catch (err) {
+        console.error('[BatchUpload] Failed:', img.url, err);
+        failCount++;
+      }
+    }
+
+    // Copy all URLs to clipboard
+    if (uploadedUrls.length > 0) {
+      const urlText = uploadedUrls.join('\n');
+      try {
+        await navigator.clipboard.writeText(urlText);
+        setToast({ visible: true, message: `${t('uploadSuccess')} (${uploadedUrls.length})` });
+      } catch {
+        prompt('上傳成功！複製網址：', urlText);
+      }
+    }
+
+    if (failCount > 0) {
+      setToast({ visible: true, message: t('completedMessage', { success: uploadedUrls.length, failed: failCount }) });
+    }
+
+    // Exit multi-select
+    setSelectedImageIds(new Set());
+    setIsMultiSelectMode(false);
+  }, [selectedImageIds, selectedAlbum, t]);
+
   const handleSave = async () => {
     // For album mode: download web image to local
     if (viewMode === 'album' && selectedAlbum && selectedAlbum.images[albumImageIndex]) {
@@ -624,6 +751,28 @@ function App() {
   useEffect(() => {
     setAlbumImageIndex(0);
   }, [selectedAlbumId]);
+
+  // Preload adjacent album images for smoother navigation
+  useEffect(() => {
+    if (viewMode !== 'album' || albumImages.length === 0) return;
+
+    const preloadRange = 3;
+    const toPreload = [];
+
+    for (let i = 1; i <= preloadRange; i++) {
+      if (safeAlbumIndex + i < albumImages.length) {
+        toPreload.push(albumImages[safeAlbumIndex + i]?.url);
+      }
+      if (safeAlbumIndex - i >= 0) {
+        toPreload.push(albumImages[safeAlbumIndex - i]?.url);
+      }
+    }
+
+    toPreload.filter(Boolean).forEach(url => {
+      const img = new Image();
+      img.src = url;
+    });
+  }, [viewMode, safeAlbumIndex, albumImages]);
 
   // Copy image to clipboard
   const handleCopy = async () => {
@@ -849,6 +998,77 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isEditing, viewMode, nextImage, prevImage, nextAlbumImage, prevAlbumImage, nextVirtualImage, prevVirtualImage]);
 
+  // Paste from clipboard (Ctrl+V / Cmd+V)
+  useEffect(() => {
+    const handlePaste = async (e) => {
+      // Skip if editing or if focus is on an input
+      if (isEditing) return;
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+      const clipboardData = e.clipboardData;
+      if (!clipboardData) return;
+
+      // Check for image blob
+      const imageItem = Array.from(clipboardData.items).find(
+        item => item.type.startsWith('image/')
+      );
+
+      if (imageItem) {
+        e.preventDefault();
+        const blob = imageItem.getAsFile();
+        if (!blob) return;
+
+        // Convert to base64
+        const reader = new FileReader();
+        reader.onload = async () => {
+          const base64 = reader.result;
+
+          if (viewMode === 'album' && selectedAlbumId) {
+            // Album mode: upload and add URL
+            try {
+              const formData = new FormData();
+              formData.append('file', blob, `paste-${Date.now()}.png`);
+              const response = await fetch('https://api.urusai.cc/v1/upload', {
+                method: 'POST',
+                body: formData
+              });
+              const result = await response.json();
+              if (result.status === 'success' && result.data) {
+                const imageUrl = result.data.url_direct || result.data.url_preview;
+                addAlbumImage(selectedAlbumId, imageUrl);
+                setToast({ visible: true, message: t('imageAdded') });
+              }
+            } catch (err) {
+              console.error('[Paste] Upload failed:', err);
+              setToast({ visible: true, message: t('uploadFailed', { error: err.message }) });
+            }
+          } else {
+            // Local mode: set as current image (unsaved)
+            setLocalImage(base64);
+            setIsModified(true);
+            setToast({ visible: true, message: t('imageAdded') });
+          }
+        };
+        reader.readAsDataURL(blob);
+        return;
+      }
+
+      // Check for URL text
+      const text = clipboardData.getData('text/plain');
+      if (text && text.trim().startsWith('http')) {
+        const urls = text.split(/[\n,]/).map(u => u.trim()).filter(u => u.startsWith('http'));
+        if (urls.length > 0 && viewMode === 'album' && selectedAlbumId) {
+          e.preventDefault();
+          urls.forEach(url => addAlbumImage(selectedAlbumId, url));
+          setToast({ visible: true, message: t('imageAdded') });
+        }
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [isEditing, viewMode, selectedAlbumId, addAlbumImage, t]);
+
   return (
     <div className="h-screen w-screen bg-[#0A0A0A] text-white overflow-hidden flex flex-col select-none">
 
@@ -908,6 +1128,15 @@ function App() {
             onCreateAlbum={createAlbum}
             onRenameAlbum={renameAlbum}
             onDeleteAlbum={deleteAlbum}
+            onExportAlbums={exportAlbums}
+            onImportAlbums={(json) => {
+              const result = importAlbums(json);
+              if (result.success) {
+                setToast({ visible: true, message: `匯入成功 (${result.count} 個相簿)` });
+              } else {
+                setToast({ visible: true, message: `匯入失敗: ${result.error}` });
+              }
+            }}
             isVisible={!albumSidebarCollapsed}
           />
         )}
@@ -926,6 +1155,9 @@ function App() {
             onEnterMultiSelect={() => setIsMultiSelectMode(true)}
             onExitMultiSelect={exitMultiSelectMode}
             onDeleteSelected={handleBatchDelete}
+            onDownloadSelected={handleBatchDownload}
+            onUploadSelected={handleBatchUpload}
+            onReorder={viewMode === 'album' ? (from, to) => reorderImages(selectedAlbumId, from, to) : undefined}
           />
         )}
 

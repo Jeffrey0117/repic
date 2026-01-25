@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 // Must be called at runtime, not at module load time
 const getElectronAPI = () => window.electronAPI || null;
 
+const LAST_FOLDER_KEY = 'repic-last-folder';
+
 export const useFileSystem = () => {
     const [files, setFiles] = useState([]);
     const [currentIndex, setCurrentIndex] = useState(-1);
@@ -12,29 +14,47 @@ export const useFileSystem = () => {
     const [thumbCache, setThumbCache] = useState({}); // Simple memory cache
     const [cacheVersion, setCacheVersion] = useState(0); // For cache busting after save
 
-    // Initial Load - Desktop with retry mechanism
+    // Initial Load - Try last folder first, fallback to desktop
     useEffect(() => {
         let attempts = 0;
         const maxAttempts = 20; // Try for 2 seconds max
 
-        const tryLoadDesktop = () => {
+        const tryLoad = () => {
             const electronAPI = getElectronAPI();
             if (electronAPI) {
                 try {
+                    // Try to load last opened folder first
+                    const lastFolder = localStorage.getItem(LAST_FOLDER_KEY);
+                    if (lastFolder) {
+                        // Verify folder still exists
+                        const files = electronAPI.getFilesInDirectory(lastFolder);
+                        if (files && files.length >= 0) {
+                            loadFolder(lastFolder);
+                            return;
+                        }
+                    }
+                    // Fallback to desktop
                     const desktopPath = electronAPI.getDesktopPath();
                     loadFolder(desktopPath);
                 } catch (e) {
-                    console.error("Failed to load desktop", e);
+                    console.error("Failed to load folder", e);
+                    // Try desktop as fallback
+                    try {
+                        const desktopPath = electronAPI.getDesktopPath();
+                        loadFolder(desktopPath);
+                    } catch (e2) {
+                        console.error("Failed to load desktop", e2);
+                    }
                 }
             } else if (attempts < maxAttempts) {
                 attempts++;
-                setTimeout(tryLoadDesktop, 100);
+                setTimeout(tryLoad, 100);
             } else {
                 console.warn('electronAPI not available after retries');
             }
         };
 
-        tryLoadDesktop();
+        tryLoad();
     }, []);
 
     const loadFolder = useCallback((folderPath, preserveIndex = false) => {
@@ -50,6 +70,8 @@ export const useFileSystem = () => {
                     setCurrentIndex(0);
                 }
                 setCurrentPath(folderPath);
+                // Save last opened folder
+                localStorage.setItem(LAST_FOLDER_KEY, folderPath);
 
                 // Bump cache version to force image reload in Sidebar
                 if (preserveIndex) {
@@ -119,6 +141,42 @@ export const useFileSystem = () => {
     }, []);
 
     const currentImage = files[currentIndex] || null;
+
+    // Preload adjacent images for smoother navigation
+    useEffect(() => {
+        if (files.length === 0 || currentIndex < 0) return;
+
+        const preloadRange = 3; // Preload 3 images ahead and behind
+        const toPreload = [];
+
+        for (let i = 1; i <= preloadRange; i++) {
+            // Next images
+            if (currentIndex + i < files.length) {
+                toPreload.push(files[currentIndex + i]);
+            }
+            // Previous images
+            if (currentIndex - i >= 0) {
+                toPreload.push(files[currentIndex - i]);
+            }
+        }
+
+        toPreload.forEach(file => {
+            // Check if it's a .repic file
+            if (file.toLowerCase().endsWith('.repic')) {
+                const electronAPI = getElectronAPI();
+                if (electronAPI) {
+                    const data = electronAPI.readFile(file);
+                    if (data?.url) {
+                        const img = new Image();
+                        img.src = data.url;
+                    }
+                }
+            } else {
+                const img = new Image();
+                img.src = `file://${file}`;
+            }
+        });
+    }, [currentIndex, files]);
 
     useEffect(() => {
         const electronAPI = getElectronAPI();
