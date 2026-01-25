@@ -170,7 +170,7 @@ export const Sidebar = ({
     // Virtual scrolling state
     const [scrollPosition, setScrollPosition] = useState(0);
     const [containerSize, setContainerSize] = useState(0);
-    const ITEM_GAP = 20; // gap between items
+    const ITEM_GAP = 28; // gap between items
     const ITEM_SIZE = thumbSize + 40 + ITEM_GAP; // thumb + label + gap
     const OVERSCAN = 3; // Extra items to render outside viewport
 
