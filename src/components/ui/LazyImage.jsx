@@ -153,11 +153,17 @@ export const LazyImage = memo(({
 
     return (
         <div ref={imgRef} className={`relative ${className}`} style={style}>
-            {/* Loading spinner */}
-            {isLoading && showSpinner && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white/80 rounded-full animate-spin" />
-                </div>
+            {/* Loading state: spinner for full images, subtle bg for thumbnails */}
+            {isLoading && (
+                useThumbnail ? (
+                    // Thumbnails: just a subtle shimmer background, no spinner
+                    <div className="absolute inset-0 bg-white/5 animate-pulse" />
+                ) : showSpinner ? (
+                    // Full images: show spinner
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white/80 rounded-full animate-spin" />
+                    </div>
+                ) : null
             )}
             {/* Image */}
             {loadedSrc && (

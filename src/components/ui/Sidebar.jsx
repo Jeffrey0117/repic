@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getThumbnail, saveThumbnail, generateThumbnail } from '../../utils/thumbnailCache';
 import { getCachedImage, cacheImage } from '../../utils/offlineCache';
-import { preloadImages, getCached } from '../../utils/imageLoader';
+import { preloadImages, preloadThumbnails, getCached } from '../../utils/imageLoader';
 import { LazyImage } from './LazyImage';
 
 const SIDEBAR_WIDTH_KEY = 'sidebar-width';
@@ -290,12 +290,26 @@ export const Sidebar = ({
         loadThumbnails();
     }, [files, mode, cacheVersion]);
 
-    // Preload nearby images for web mode (smoother navigation)
+    // Preload ALL thumbnails from cache when album changes (instant display)
     useEffect(() => {
         if (mode !== 'web' || files.length === 0) return;
 
-        // Preload images around current index
-        const preloadRange = 5;
+        // Get all URLs and preload thumbnails from IndexedDB into memory
+        const allUrls = files
+            .map(file => typeof file === 'string' ? file : file.url)
+            .filter(url => url?.startsWith('http'));
+
+        if (allUrls.length > 0) {
+            preloadThumbnails(allUrls);
+        }
+    }, [files, mode]);
+
+    // Preload full images for nearby items (smoother main view navigation)
+    useEffect(() => {
+        if (mode !== 'web' || files.length === 0) return;
+
+        // Preload full images around current index for main viewer
+        const preloadRange = 3;
         const urlsToPreload = [];
 
         for (let i = -preloadRange; i <= preloadRange; i++) {
@@ -568,7 +582,7 @@ export const Sidebar = ({
             <div
                 onMouseDown={handleResizeMouseDown}
                 className={`
-                    absolute transition-colors duration-150
+                    absolute transition-colors duration-150 z-10
                     ${isHorizontal
                         ? 'left-0 top-0 h-1 w-full cursor-row-resize'
                         : 'top-0 right-0 w-1 h-full cursor-col-resize'
