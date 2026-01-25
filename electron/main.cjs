@@ -9,6 +9,9 @@ const http = require('http');
 const TEMP_DIR = path.join(os.tmpdir(), 'repic-temp');
 const TEMP_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
 
+// Cache for downloaded URLs (URL -> tempFilePath)
+const downloadCache = new Map();
+
 // Ensure temp directory exists
 function ensureTempDir() {
     if (!fs.existsSync(TEMP_DIR)) {
@@ -35,16 +38,32 @@ function cleanupTempFiles() {
     }
 }
 
-// Download image from URL to temp file
+// Download image from URL to temp file (with cache)
 function downloadToTemp(url) {
     return new Promise((resolve, reject) => {
+        // Check cache first
+        const cached = downloadCache.get(url);
+        if (cached && fs.existsSync(cached)) {
+            console.log('[downloadToTemp] Using cached:', cached);
+            resolve(cached);
+            return;
+        }
+
         ensureTempDir();
 
-        // Generate temp filename
+        // Generate temp filename using URL hash for consistency
+        const urlHash = Buffer.from(url).toString('base64').replace(/[/+=]/g, '_').slice(0, 32);
         const urlObj = new URL(url);
         const ext = path.extname(urlObj.pathname) || '.png';
-        const filename = `drag-${Date.now()}${ext}`;
+        const filename = `drag-${urlHash}${ext}`;
         const tempPath = path.join(TEMP_DIR, filename);
+
+        // Check if file already exists (from previous session)
+        if (fs.existsSync(tempPath)) {
+            downloadCache.set(url, tempPath);
+            resolve(tempPath);
+            return;
+        }
 
         const protocol = url.startsWith('https') ? https : http;
 
@@ -65,6 +84,7 @@ function downloadToTemp(url) {
 
             fileStream.on('finish', () => {
                 fileStream.close();
+                downloadCache.set(url, tempPath);
                 resolve(tempPath);
             });
 
