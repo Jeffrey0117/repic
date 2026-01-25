@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from '../../lib/motion';
+import { getThumbnail, saveThumbnail, generateThumbnail } from '../../utils/thumbnailCache';
+import { getCachedImage, cacheImage } from '../../utils/offlineCache';
 
 const SIDEBAR_WIDTH_KEY = 'sidebar-width';
 const MIN_WIDTH = 80;
@@ -13,6 +15,9 @@ const isRepicFile = (path) => path?.toLowerCase().endsWith('.repic');
 
 // Cache for proxied images (URL -> base64)
 const proxyCache = new Map();
+
+// Memory cache for thumbnails (faster than IndexedDB for current session)
+const thumbMemCache = new Map();
 
 export const Sidebar = ({
     files,
@@ -28,8 +33,10 @@ export const Sidebar = ({
     onDeleteSelected,
     onDownloadSelected,
     onUploadSelected,
-    onReorder
+    onReorder,
+    position = 'left' // 'left' or 'bottom'
 }) => {
+    const isHorizontal = position === 'bottom';
     // Cache for .repic file data (url + crop)
     const [repicData, setRepicData] = useState({});
     // Drag reorder state
@@ -41,6 +48,8 @@ export const Sidebar = ({
     const [failedImages, setFailedImages] = useState(new Set());
     // Track loading images (to show placeholder instead of broken image)
     const [loadingImages, setLoadingImages] = useState(new Set());
+    // Cached thumbnails for local files
+    const [cachedThumbs, setCachedThumbs] = useState({});
     const [width, setWidth] = useState(() => {
         const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
         if (saved) {
@@ -62,7 +71,13 @@ export const Sidebar = ({
         if (!isResizing) return;
 
         const handleMouseMove = (e) => {
-            const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, e.clientX));
+            let newWidth;
+            if (isHorizontal) {
+                // For bottom sidebar, calculate height from bottom of window
+                newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, window.innerHeight - e.clientY));
+            } else {
+                newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, e.clientX));
+            }
             setWidth(newWidth);
         };
 
@@ -78,7 +93,7 @@ export const Sidebar = ({
             document.removeEventListener('mousemove', handleMouseMove);
             document.removeEventListener('mouseup', handleMouseUp);
         };
-    }, [isResizing, width]);
+    }, [isResizing, width, isHorizontal]);
 
     // Load .repic file data (url + crop) for local mode
     // Reset cache when cacheVersion changes (after crop save)
@@ -105,10 +120,83 @@ export const Sidebar = ({
         loadRepicData();
     }, [files, mode, cacheVersion]);
 
+    // Load/generate thumbnails for local files (with caching)
+    useEffect(() => {
+        if (mode !== 'local' || !electronAPI) return;
+
+        const loadThumbnails = async () => {
+            // Only process visible files (first 50)
+            const visibleFiles = files.slice(0, 50).filter(f => !isRepicFile(f));
+
+            for (const file of visibleFiles) {
+                // Skip if already cached in memory
+                if (thumbMemCache.has(file) || cachedThumbs[file]) continue;
+
+                try {
+                    // Try memory cache first
+                    if (thumbMemCache.has(file)) {
+                        setCachedThumbs(prev => ({ ...prev, [file]: thumbMemCache.get(file) }));
+                        continue;
+                    }
+
+                    // Try IndexedDB cache
+                    const cached = await getThumbnail(file, cacheVersion);
+                    if (cached) {
+                        thumbMemCache.set(file, cached);
+                        setCachedThumbs(prev => ({ ...prev, [file]: cached }));
+                        continue;
+                    }
+
+                    // Generate new thumbnail
+                    const thumb = await generateThumbnail(`file://${file}`);
+                    if (thumb) {
+                        thumbMemCache.set(file, thumb);
+                        setCachedThumbs(prev => ({ ...prev, [file]: thumb }));
+                        // Save to IndexedDB (async, don't wait)
+                        saveThumbnail(file, cacheVersion, thumb);
+                    }
+                } catch (e) {
+                    // Silently fail, will use original image
+                }
+            }
+        };
+
+        loadThumbnails();
+    }, [files, mode, cacheVersion]);
+
+    // Load cached images for web mode (offline support)
+    useEffect(() => {
+        if (mode !== 'web') return;
+
+        const loadCachedImages = async () => {
+            const visibleFiles = files.slice(0, 50);
+
+            for (const file of visibleFiles) {
+                const url = typeof file === 'string' ? file : file.url;
+                if (!url || proxiedUrls[url]) continue;
+
+                try {
+                    const cached = await getCachedImage(url);
+                    if (cached) {
+                        setProxiedUrls(prev => ({ ...prev, [url]: cached }));
+                    }
+                } catch (e) {
+                    // Ignore cache errors
+                }
+            }
+        };
+
+        loadCachedImages();
+    }, [files, mode]);
+
     return (
         <div
-            className="h-full bg-surface/30 backdrop-blur-xl border-r border-white/5 flex flex-col overflow-hidden relative"
-            style={{ width: `${width}px` }}
+            className={`bg-surface/30 backdrop-blur-xl overflow-hidden relative ${
+                isHorizontal
+                    ? 'w-full border-t border-white/5 flex flex-row'
+                    : 'h-full border-r border-white/5 flex flex-col'
+            }`}
+            style={isHorizontal ? { height: `${width}px` } : { width: `${width}px` }}
         >
             {/* Multi-select toolbar for album mode */}
             {mode === 'web' && (
@@ -164,7 +252,11 @@ export const Sidebar = ({
                 </div>
             )}
 
-            <div className="flex-1 overflow-y-auto no-scrollbar py-4 px-2 space-y-3">
+            <div className={`flex-1 no-scrollbar ${
+                isHorizontal
+                    ? 'overflow-x-auto overflow-y-hidden px-4 py-2 flex flex-row gap-3'
+                    : 'overflow-y-auto py-4 px-2 space-y-3'
+            }`}>
                 {files.map((file, index) => {
                     const isActive = index === currentIndex;
                     // For local mode: file is a path, extract filename
@@ -184,8 +276,10 @@ export const Sidebar = ({
                             ? (repicInfo?.url || '')
                             : `file://${file}?v=${cacheVersion}`;
 
-                    // Use proxied URL if available (for hotlink protected images)
-                    const imgSrc = (isWeb && proxiedUrls[fileUrl]) ? proxiedUrls[fileUrl] : originalUrl;
+                    // Use cached thumbnail for local files, proxied URL for web
+                    const imgSrc = isWeb
+                        ? (proxiedUrls[fileUrl] || originalUrl)
+                        : (cachedThumbs[file] || originalUrl);
 
                     // Check if image failed to load
                     const isFailed = isWeb && failedImages.has(fileUrl);
@@ -301,12 +395,27 @@ export const Sidebar = ({
                                                     setLoadingImages(prev => new Set([...prev, fileUrl]));
                                                 }
                                             }}
-                                            onLoad={() => {
+                                            onLoad={(e) => {
                                                 setLoadingImages(prev => {
                                                     const newSet = new Set(prev);
                                                     newSet.delete(fileUrl);
                                                     return newSet;
                                                 });
+                                                // Cache for offline use (web images only, not already cached)
+                                                if (isWeb && !proxiedUrls[fileUrl] && originalUrl.startsWith('http')) {
+                                                    // Convert loaded image to base64 and cache
+                                                    try {
+                                                        const canvas = document.createElement('canvas');
+                                                        const img = e.target;
+                                                        canvas.width = img.naturalWidth;
+                                                        canvas.height = img.naturalHeight;
+                                                        canvas.getContext('2d').drawImage(img, 0, 0);
+                                                        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                                                        cacheImage(originalUrl, dataUrl);
+                                                    } catch (err) {
+                                                        // Cross-origin images may fail, ignore
+                                                    }
+                                                }
                                             }}
                                             onError={async (e) => {
                                                 // Remove from loading
@@ -327,6 +436,8 @@ export const Sidebar = ({
                                                     });
                                                     if (result.success) {
                                                         setProxiedUrls(prev => ({ ...prev, [fileUrl]: result.data }));
+                                                        // Cache the proxied image for offline use
+                                                        cacheImage(originalUrl, result.data);
                                                     } else {
                                                         setFailedImages(prev => new Set([...prev, fileUrl]));
                                                     }
@@ -361,8 +472,11 @@ export const Sidebar = ({
             <div
                 onMouseDown={handleMouseDown}
                 className={`
-                    absolute top-0 right-0 w-1 h-full cursor-col-resize
-                    transition-colors duration-150
+                    absolute transition-colors duration-150
+                    ${isHorizontal
+                        ? 'left-0 top-0 h-1 w-full cursor-row-resize'
+                        : 'top-0 right-0 w-1 h-full cursor-col-resize'
+                    }
                     ${isResizing ? 'bg-primary' : 'bg-transparent hover:bg-white/30'}
                 `}
             />

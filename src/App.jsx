@@ -85,6 +85,11 @@ function App() {
   // Album sidebar collapsed state
   const [albumSidebarCollapsed, setAlbumSidebarCollapsed] = useState(false);
 
+  // Thumbnail sidebar position: 'left' or 'bottom'
+  const [sidebarPosition, setSidebarPosition] = useState(() => {
+    return localStorage.getItem('repic-sidebar-position') || 'left';
+  });
+
   // Drag-drop state for album mode
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -1115,51 +1120,60 @@ function App() {
         onToggleAlbumSidebar={() => setAlbumSidebarCollapsed(!albumSidebarCollapsed)}
         onExportVirtual={() => setShowExportDialog(true)}
         hasImage={!!(localImage || currentAlbumImage || virtualImageData?.url)}
+        sidebarPosition={sidebarPosition}
+        onToggleSidebarPosition={() => {
+          const newPos = sidebarPosition === 'left' ? 'bottom' : 'left';
+          setSidebarPosition(newPos);
+          localStorage.setItem('repic-sidebar-position', newPos);
+        }}
       />
 
       {/* 2. Main Content Area */}
-      <div className="flex-1 overflow-hidden flex">
-        {/* Album Sidebar - only in album mode */}
-        {viewMode === 'album' && (
-          <AlbumSidebar
-            albums={albums}
-            selectedAlbumId={selectedAlbumId}
-            onSelectAlbum={selectAlbum}
-            onCreateAlbum={createAlbum}
-            onRenameAlbum={renameAlbum}
-            onDeleteAlbum={deleteAlbum}
-            onExportAlbums={exportAlbums}
-            onImportAlbums={(json) => {
-              const result = importAlbums(json);
-              if (result.success) {
-                setToast({ visible: true, message: `匯入成功 (${result.count} 個相簿)` });
-              } else {
-                setToast({ visible: true, message: `匯入失敗: ${result.error}` });
-              }
-            }}
-            isVisible={!albumSidebarCollapsed}
-          />
-        )}
+      <div className={`flex-1 overflow-hidden flex ${sidebarPosition === 'bottom' ? 'flex-col' : ''}`}>
+        {/* Upper row: AlbumSidebar + (Sidebar if left) + main + InfoPanel */}
+        <div className={`${sidebarPosition === 'bottom' ? 'flex-1 overflow-hidden' : 'contents'} flex`}>
+          {/* Album Sidebar - only in album mode */}
+          {viewMode === 'album' && (
+            <AlbumSidebar
+              albums={albums}
+              selectedAlbumId={selectedAlbumId}
+              onSelectAlbum={selectAlbum}
+              onCreateAlbum={createAlbum}
+              onRenameAlbum={renameAlbum}
+              onDeleteAlbum={deleteAlbum}
+              onExportAlbums={exportAlbums}
+              onImportAlbums={(json) => {
+                const result = importAlbums(json);
+                if (result.success) {
+                  setToast({ visible: true, message: `匯入成功 (${result.count} 個相簿)` });
+                } else {
+                  setToast({ visible: true, message: `匯入失敗: ${result.error}` });
+                }
+              }}
+              isVisible={!albumSidebarCollapsed}
+            />
+          )}
 
-        {/* Left: Thumbnail Explorer - hide when no images */}
-        {((viewMode === 'album' && albumImages.length > 0) || (viewMode !== 'album' && files.length > 0)) && (
-          <Sidebar
-            files={viewMode === 'album' ? albumImages : files}
-            currentIndex={viewMode === 'album' ? safeAlbumIndex : currentIndex}
-            cacheVersion={cacheVersion}
-            onSelect={viewMode === 'album' ? setAlbumImageIndex : selectImage}
-            mode={viewMode === 'album' ? 'web' : 'local'}
-            isMultiSelectMode={viewMode === 'album' && isMultiSelectMode}
-            selectedIds={selectedImageIds}
-            onToggleSelect={toggleImageSelection}
-            onEnterMultiSelect={() => setIsMultiSelectMode(true)}
-            onExitMultiSelect={exitMultiSelectMode}
-            onDeleteSelected={handleBatchDelete}
-            onDownloadSelected={handleBatchDownload}
-            onUploadSelected={handleBatchUpload}
-            onReorder={viewMode === 'album' ? (from, to) => reorderImages(selectedAlbumId, from, to) : undefined}
-          />
-        )}
+          {/* Left Sidebar: Thumbnail Explorer - only when position is left */}
+          {sidebarPosition === 'left' && ((viewMode === 'album' && albumImages.length > 0) || (viewMode !== 'album' && files.length > 0)) && (
+            <Sidebar
+              files={viewMode === 'album' ? albumImages : files}
+              currentIndex={viewMode === 'album' ? safeAlbumIndex : currentIndex}
+              cacheVersion={cacheVersion}
+              onSelect={viewMode === 'album' ? setAlbumImageIndex : selectImage}
+              mode={viewMode === 'album' ? 'web' : 'local'}
+              isMultiSelectMode={viewMode === 'album' && isMultiSelectMode}
+              selectedIds={selectedImageIds}
+              onToggleSelect={toggleImageSelection}
+              onEnterMultiSelect={() => setIsMultiSelectMode(true)}
+              onExitMultiSelect={exitMultiSelectMode}
+              onDeleteSelected={handleBatchDelete}
+              onDownloadSelected={handleBatchDownload}
+              onUploadSelected={handleBatchUpload}
+              onReorder={viewMode === 'album' ? (from, to) => reorderImages(selectedAlbumId, from, to) : undefined}
+              position={sidebarPosition}
+            />
+          )}
 
         {/* Center: Main Viewport */}
         <main
@@ -1340,6 +1354,28 @@ function App() {
           isVisible={showInfoPanel && !isEditing}
           mode={viewMode === 'album' ? 'web' : 'local'}
         />
+        </div>
+
+        {/* Bottom Sidebar: Thumbnail Explorer - only when position is bottom */}
+        {sidebarPosition === 'bottom' && ((viewMode === 'album' && albumImages.length > 0) || (viewMode !== 'album' && files.length > 0)) && (
+          <Sidebar
+            files={viewMode === 'album' ? albumImages : files}
+            currentIndex={viewMode === 'album' ? safeAlbumIndex : currentIndex}
+            cacheVersion={cacheVersion}
+            onSelect={viewMode === 'album' ? setAlbumImageIndex : selectImage}
+            mode={viewMode === 'album' ? 'web' : 'local'}
+            isMultiSelectMode={viewMode === 'album' && isMultiSelectMode}
+            selectedIds={selectedImageIds}
+            onToggleSelect={toggleImageSelection}
+            onEnterMultiSelect={() => setIsMultiSelectMode(true)}
+            onExitMultiSelect={exitMultiSelectMode}
+            onDeleteSelected={handleBatchDelete}
+            onDownloadSelected={handleBatchDownload}
+            onUploadSelected={handleBatchUpload}
+            onReorder={viewMode === 'album' ? (from, to) => reorderImages(selectedAlbumId, from, to) : undefined}
+            position={sidebarPosition}
+          />
+        )}
       </div>
 
       {/* Post-Crop Save Toolbar */}

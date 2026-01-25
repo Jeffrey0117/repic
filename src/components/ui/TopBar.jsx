@@ -31,7 +31,15 @@ const PanelLeft = ({ size = 24, className = '' }) => (
     </svg>
 );
 
-export const TopBar = ({ currentPath, onOpenFolder, onRefresh, isEditing, onToggleEdit, onClear, onDeleteAlbumImage, onSave, onCopy, isCopying, onUpload, isUploading, uploadHistoryCount, onToggleUploadHistory, showInfoPanel, onToggleInfo, viewMode, onToggleViewMode, selectedAlbum, onAddAlbumImage, albumSidebarCollapsed, onToggleAlbumSidebar, onExportVirtual, hasImage }) => {
+// Panel bottom icon
+const PanelBottom = ({ size = 24, className = '' }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <rect width="18" height="18" x="3" y="3" rx="2" />
+        <path d="M3 15h18" />
+    </svg>
+);
+
+export const TopBar = ({ currentPath, onOpenFolder, onRefresh, isEditing, onToggleEdit, onClear, onDeleteAlbumImage, onSave, onCopy, isCopying, onUpload, isUploading, uploadHistoryCount, onToggleUploadHistory, showInfoPanel, onToggleInfo, viewMode, onToggleViewMode, selectedAlbum, onAddAlbumImage, albumSidebarCollapsed, onToggleAlbumSidebar, onExportVirtual, hasImage, sidebarPosition, onToggleSidebarPosition }) => {
     const { t, language, setLanguage } = useI18n();
     const { theme, toggleTheme } = useTheme();
     const [urlInput, setUrlInput] = useState('');
@@ -187,6 +195,14 @@ export const TopBar = ({ currentPath, onOpenFolder, onRefresh, isEditing, onTogg
                     title={t('toggleInfo')}
                 >
                     <Info size={18} />
+                </Button>
+                <Button
+                    variant="ghost"
+                    className={`h-9 w-9 p-0 rounded-lg hover:bg-black/10 dark:hover:bg-white/5 ${theme === 'dark' ? 'text-white/70' : 'text-gray-600'}`}
+                    onClick={onToggleSidebarPosition}
+                    title={sidebarPosition === 'left' ? '縮圖移到底部' : '縮圖移到左側'}
+                >
+                    {sidebarPosition === 'left' ? <PanelBottom size={18} /> : <PanelLeft size={18} />}
                 </Button>
                 <Button variant="ghost" className={`h-9 w-9 p-0 rounded-lg hover:bg-black/10 dark:hover:bg-white/5 ${theme === 'dark' ? 'text-white/70' : 'text-gray-600'}`} onClick={onSave}>
                     <Download size={18} className="hover:text-primary transition-colors" />

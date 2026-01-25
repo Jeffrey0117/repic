@@ -107,12 +107,15 @@
       "deleteAppDataOnUninstall": true,
       "perMachine": false
     },
-    "electronLanguages": ["en-US"]
+    "electronLanguages": [
+      "en-US"
+    ]
   },
   "dependencies": {
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "react-image-crop": "^11.0.10"
+    "react-image-crop": "^11.0.10",
+    "react-window": "^2.2.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
