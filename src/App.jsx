@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense, useCallback } from 'react';
+import { useState, useEffect, lazy, Suspense, useCallback, useMemo } from 'react';
 import { AnimatePresence, motion } from './lib/motion';
 import { Dropzone } from './features/viewer/Dropzone';
 import { ImageViewer } from './features/viewer/ImageViewer';
@@ -103,22 +103,16 @@ function App() {
 
   // Sync file system image with local view only when currentImage or cacheVersion changes
   useEffect(() => {
-    console.log('[App useEffect] Triggered - currentImage:', currentImage, 'currentIndex:', currentIndex, 'cacheVersion:', cacheVersion);
     if (currentImage) {
       // Check if it's a .repic virtual image file
       if (currentImage.toLowerCase().endsWith('.repic')) {
         const electronAPI = getElectronAPI();
         if (electronAPI) {
           const result = electronAPI.readFile(currentImage);
-          console.log('[App] Reading .repic file:', currentImage);
-          console.log('[App] Result:', result);
           if (result && typeof result === 'object' && result.url) {
-            console.log('[App] Setting localImage:', result.url);
-            console.log('[App] Setting localCrop:', result.crop);
             setLocalImage(result.url);
             setLocalCrop(result.crop || null);
           } else {
-            console.log('[App] No valid URL in result');
             setLocalImage(null);
             setLocalCrop(null);
           }
@@ -735,11 +729,17 @@ function App() {
     link.click();
   };
 
-  // Album navigation
-  const albumImages = selectedAlbum?.images || [];
+  // Album navigation (memoized for performance)
+  const albumImages = useMemo(() => selectedAlbum?.images || [], [selectedAlbum?.images]);
   // Ensure index is within bounds (important when switching albums)
-  const safeAlbumIndex = albumImages.length > 0 ? Math.min(albumImageIndex, albumImages.length - 1) : 0;
-  const currentAlbumImage = albumImages.length > 0 ? (albumImages[safeAlbumIndex]?.url || null) : null;
+  const safeAlbumIndex = useMemo(() =>
+    albumImages.length > 0 ? Math.min(albumImageIndex, albumImages.length - 1) : 0,
+    [albumImages.length, albumImageIndex]
+  );
+  const currentAlbumImage = useMemo(() =>
+    albumImages.length > 0 ? (albumImages[safeAlbumIndex]?.url || null) : null,
+    [albumImages, safeAlbumIndex]
+  );
 
   const nextAlbumImage = useCallback(() => {
     if (albumImageIndex < albumImages.length - 1) {
@@ -1076,7 +1076,52 @@ function App() {
   }, [isEditing, viewMode, selectedAlbumId, addAlbumImage, t]);
 
   return (
-    <div className="h-screen w-screen bg-[#0A0A0A] text-white overflow-hidden flex flex-col select-none">
+    <div
+      className="h-screen w-screen bg-[#0A0A0A] text-white overflow-hidden flex flex-col select-none relative"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* Global Drag Overlay */}
+      <AnimatePresence>
+        {isDragOver && viewMode === 'album' && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center pointer-events-none"
+          >
+            <motion.div
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              className="flex flex-col items-center gap-4"
+            >
+              <motion.div
+                animate={{
+                  scale: [1, 1.1, 1],
+                  opacity: [0.5, 1, 0.5]
+                }}
+                transition={{
+                  duration: 1.5,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+                className="w-24 h-24 rounded-2xl border-4 border-dashed border-primary flex items-center justify-center"
+              >
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-primary">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+              </motion.div>
+              <div className="text-center">
+                <p className="text-xl font-medium text-white">放開以新增圖片</p>
+                <p className="text-sm text-white/60 mt-1">拖曳圖片或網址到此處</p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* 1. Header Section */}
       <TopBar
@@ -1180,22 +1225,9 @@ function App() {
 
         {/* Center: Main Viewport */}
         <main
-          className={`flex-1 min-w-0 min-h-0 relative main-viewport-bg overflow-hidden transition-all duration-300 ${
-            isDragOver && viewMode === 'album' ? 'ring-4 ring-primary/50 ring-inset' : ''
-          }`}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
+          className="flex-1 min-w-0 min-h-0 relative main-viewport-bg overflow-hidden transition-all duration-300"
         >
-          {/* Drag-drop overlay indicator */}
-          {isDragOver && viewMode === 'album' && (
-            <div className="absolute inset-0 z-50 bg-primary/10 flex items-center justify-center pointer-events-none">
-              <div className="bg-black/80 text-white px-6 py-4 rounded-xl text-lg font-medium">
-                {t('dropToAdd') || 'Drop to add image'}
-              </div>
-            </div>
-          )}
-          <AnimatePresence mode="wait">
+          <AnimatePresence>
             {viewMode === 'virtual' ? (
               // Virtual image mode (opened from .repic file)
               virtualImageData ? (

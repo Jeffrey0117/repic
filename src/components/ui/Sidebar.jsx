@@ -103,12 +103,17 @@ export const Sidebar = ({
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [isHorizontal, currentIndex, files.length, onSelect]);
 
-    // Drag to scroll (carousel effect)
+    // Drag to scroll (carousel effect) - only when middle mouse or explicit drag
     const handleScrollDragStart = useCallback((e) => {
+        // Only allow drag scroll with middle mouse button (wheel click)
+        // Left click should select, not drag scroll
+        if (e.button !== 1) return; // 1 = middle button
         if (isReorderMode || isMultiSelectMode) return;
+
         const container = scrollContainerRef.current;
         if (!container) return;
 
+        e.preventDefault();
         setIsDragScrolling(true);
         setDragScrollStart({
             x: e.clientX,
@@ -118,6 +123,7 @@ export const Sidebar = ({
         });
     }, [isReorderMode, isMultiSelectMode]);
 
+    // Global cleanup for drag scrolling - ensures state is always cleaned up
     useEffect(() => {
         if (!isDragScrolling) return;
 
@@ -138,14 +144,26 @@ export const Sidebar = ({
             setIsDragScrolling(false);
         };
 
+        // Also clean up on blur (window loses focus)
+        const handleBlur = () => {
+            setIsDragScrolling(false);
+        };
+
         document.addEventListener('mousemove', handleMouseMove);
         document.addEventListener('mouseup', handleMouseUp);
+        window.addEventListener('blur', handleBlur);
 
         return () => {
             document.removeEventListener('mousemove', handleMouseMove);
             document.removeEventListener('mouseup', handleMouseUp);
+            window.removeEventListener('blur', handleBlur);
         };
     }, [isDragScrolling, dragScrollStart, isHorizontal]);
+
+    // Safety: reset drag state when mode changes
+    useEffect(() => {
+        setIsDragScrolling(false);
+    }, [isReorderMode, isMultiSelectMode]);
 
     // Calculate thumbnail size based on position
     const thumbSize = isHorizontal ? height - 60 : width - 24; // Leave room for labels
@@ -388,7 +406,7 @@ export const Sidebar = ({
                     isHorizontal
                         ? 'overflow-x-auto overflow-y-hidden px-4 py-2 flex flex-row gap-3 items-center'
                         : 'overflow-y-auto py-4 px-2 space-y-3'
-                } ${isDragScrolling ? 'cursor-grabbing' : 'cursor-grab'}`}
+                } ${isDragScrolling ? 'cursor-grabbing' : ''}`}
             >
                 {files.map((file, index) => {
                     const isActive = index === currentIndex;

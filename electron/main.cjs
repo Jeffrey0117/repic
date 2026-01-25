@@ -637,6 +637,30 @@ function setupIpcHandlers() {
         }
     });
 
+    // Set always on top
+    ipcMain.handle('set-always-on-top', (event, value) => {
+        console.log('[set-always-on-top] Called with value:', value);
+        if (mainWindow) {
+            // Use 'floating' level for better Windows compatibility
+            mainWindow.setAlwaysOnTop(value, 'floating');
+            const actualValue = mainWindow.isAlwaysOnTop();
+            console.log('[set-always-on-top] Result:', actualValue);
+            return { success: true, isAlwaysOnTop: actualValue };
+        }
+        console.log('[set-always-on-top] Window not found');
+        return { success: false, error: 'Window not found' };
+    });
+
+    // Get always on top status
+    ipcMain.handle('get-always-on-top', () => {
+        if (mainWindow) {
+            const value = mainWindow.isAlwaysOnTop();
+            console.log('[get-always-on-top] Current value:', value);
+            return { success: true, isAlwaysOnTop: value };
+        }
+        return { success: false, error: 'Window not found' };
+    });
+
     // Batch crop - save cropped image data to file
     ipcMain.handle('batch-crop-save', async (event, { filePath, base64Data, outputMode, originalPath, customDir }) => {
         console.log('[batch-crop-save] Received:', { filePath, outputMode, originalPath, customDir, hasBase64: !!base64Data });

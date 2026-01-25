@@ -220,5 +220,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
             return { success: false, error: 'Invalid URL' };
         }
         return await ipcRenderer.invoke('proxy-image', url);
+    },
+
+    // Set always on top
+    setAlwaysOnTop: async (value) => {
+        return await ipcRenderer.invoke('set-always-on-top', !!value);
+    },
+
+    // Get always on top status
+    getAlwaysOnTop: async () => {
+        return await ipcRenderer.invoke('get-always-on-top');
     }
 });

@@ -114,5 +114,11 @@
   "copyFailed": "複製失敗",
   "cropSaved": "裁切範圍已儲存！",
   "dropToAdd": "放開以新增圖片",
-  "imageAdded": "圖片已新增！"
+  "imageAdded": "圖片已新增！",
+  "pinWindow": "視窗置頂",
+  "unpinWindow": "取消置頂",
+  "addUrl": "新增網址",
+  "addImageUrl": "新增圖片網址",
+  "pasteImageUrlPlaceholder": "在此貼上圖片網址...\n支援多個網址（每行一個或用逗號分隔）",
+  "urlInputHint": "提示：可一次貼上多個網址，用換行或逗號分隔"
 }

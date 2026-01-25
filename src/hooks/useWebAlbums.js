@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 
 const STORAGE_KEY = 'repic-web-albums';
 
@@ -27,17 +27,24 @@ export const useWebAlbums = () => {
     return stored.length > 0 ? stored[0].id : null;
   });
 
-  // Save albums to localStorage whenever they change
+  // Save albums to localStorage whenever they change (debounced)
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(albums));
-    } catch (e) {
-      console.error('[useWebAlbums] Failed to save to localStorage:', e);
-    }
+    const timeoutId = setTimeout(() => {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(albums));
+      } catch (e) {
+        console.error('[useWebAlbums] Failed to save to localStorage:', e);
+      }
+    }, 300); // Debounce 300ms
+
+    return () => clearTimeout(timeoutId);
   }, [albums]);
 
-  // Get current selected album
-  const selectedAlbum = albums.find(a => a.id === selectedAlbumId) || null;
+  // Get current selected album (memoized)
+  const selectedAlbum = useMemo(() =>
+    albums.find(a => a.id === selectedAlbumId) || null,
+    [albums, selectedAlbumId]
+  );
 
   // Create new album
   const createAlbum = useCallback((name) => {
