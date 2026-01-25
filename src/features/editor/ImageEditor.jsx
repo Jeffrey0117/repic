@@ -13,7 +13,6 @@ const TABS = {
   CROP: 'crop',
   ANNOTATE: 'annotate',
   MOSAIC: 'mosaic',
-  REMOVE_BG: 'removeBg',
   COMPRESS: 'compress'
 };
 
@@ -43,10 +42,6 @@ export const ImageEditor = ({
   // Compress state
   const [quality, setQuality] = useState(85);
   const [estimatedSize, setEstimatedSize] = useState(null);
-
-  // Remove BG state
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [processedImage, setProcessedImage] = useState(null);
 
   const imgRef = useRef(null);
 
@@ -109,12 +104,6 @@ export const ImageEditor = ({
       return;
     }
 
-    // If remove bg was used, return processed image
-    if (processedImage) {
-      onComplete(processedImage);
-      return;
-    }
-
     if (completedCrop && imgRef.current) {
       try {
         const croppedImage = await getCroppedImg(
@@ -131,20 +120,6 @@ export const ImageEditor = ({
       }
     } else {
       onComplete(imageSrc);
-    }
-  };
-
-  // Remove background (placeholder - needs API)
-  const handleRemoveBg = async () => {
-    setIsProcessing(true);
-    try {
-      // TODO: Integrate with remove.bg API or local model
-      // For now, show a message
-      alert(t('removeBgNotImplemented') || '去背功能开发中，请稍后...');
-    } catch (e) {
-      console.error('[ImageEditor] Remove BG error:', e);
-    } finally {
-      setIsProcessing(false);
     }
   };
 
@@ -206,26 +181,6 @@ export const ImageEditor = ({
           </div>
         );
 
-      case TABS.REMOVE_BG:
-        return (
-          <div className="flex flex-col items-center gap-3">
-            <button
-              onClick={handleRemoveBg}
-              disabled={isProcessing}
-              className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${
-                isProcessing
-                  ? 'bg-gray-500 text-white/50 cursor-not-allowed'
-                  : 'bg-primary text-white hover:bg-primary/80'
-              }`}
-            >
-              {isProcessing ? (t('processing') || '处理中...') : (t('removeBg') || '一键去背')}
-            </button>
-            <p className={`text-xs ${isDark ? 'text-white/40' : 'text-black/40'}`}>
-              {t('removeBgHint') || '自动移除图片背景'}
-            </p>
-          </div>
-        );
-
       case TABS.COMPRESS:
         return (
           <div className="flex flex-col items-center gap-3 w-full max-w-md mx-auto">
@@ -279,7 +234,6 @@ export const ImageEditor = ({
     { id: TABS.CROP, label: t('crop') || '裁剪' },
     { id: TABS.ANNOTATE, label: t('annotate') || '标注' },
     { id: TABS.MOSAIC, label: t('mosaic') || '马赛克' },
-    { id: TABS.REMOVE_BG, label: t('removeBg') || '去背' },
     { id: TABS.COMPRESS, label: t('compress') || '压缩' },
   ];
 
@@ -312,7 +266,7 @@ export const ImageEditor = ({
           >
             <img
               ref={imgRef}
-              src={processedImage || imageSrc}
+              src={imageSrc}
               alt="Edit"
               onLoad={onImageLoad}
               className="max-w-full"
