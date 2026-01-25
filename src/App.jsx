@@ -1095,46 +1095,26 @@ function App() {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {/* Global Drag Overlay */}
-      <AnimatePresence>
-        {isDragOver && viewMode === 'album' && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center pointer-events-none"
-          >
-            <motion.div
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              className="flex flex-col items-center gap-4"
-            >
-              <motion.div
-                animate={{
-                  scale: [1, 1.1, 1],
-                  opacity: [0.5, 1, 0.5]
-                }}
-                transition={{
-                  duration: 1.5,
-                  repeat: Infinity,
-                  ease: "easeInOut"
-                }}
-                className="w-24 h-24 rounded-2xl border-4 border-dashed border-primary flex items-center justify-center"
-              >
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-primary">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="17 8 12 3 7 8" />
-                  <line x1="12" y1="3" x2="12" y2="15" />
-                </svg>
-              </motion.div>
-              <div className="text-center">
-                <p className="text-xl font-semibold text-white drop-shadow-md">放開以新增圖片</p>
-                <p className="text-sm text-white/80 mt-1">拖曳圖片或網址到此處</p>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Global Drag Overlay - uses CSS transitions for instant response */}
+      <div
+        className={`absolute inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center pointer-events-none transition-opacity duration-150 ${
+          isDragOver && viewMode === 'album' ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+      >
+        <div className={`flex flex-col items-center gap-4 transition-transform duration-150 ${isDragOver ? 'scale-100' : 'scale-95'}`}>
+          <div className={`w-24 h-24 rounded-2xl border-4 border-dashed border-primary flex items-center justify-center ${isDragOver ? 'animate-pulse' : ''}`}>
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-primary">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+          </div>
+          <div className="text-center">
+            <p className="text-xl font-semibold text-white drop-shadow-md">放開以新增圖片</p>
+            <p className="text-sm text-white/80 mt-1">拖曳圖片或網址到此處</p>
+          </div>
+        </div>
+      </div>
 
       {/* 1. Header Section */}
       <TopBar

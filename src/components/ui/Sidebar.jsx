@@ -495,6 +495,7 @@ export const Sidebar = ({
                                 setDragOverIndex(null);
                             }}
                             className={`relative cursor-pointer group flex flex-col items-center ${isDragging ? 'opacity-50' : ''} ${isDragOver ? 'scale-110' : ''}`}
+                            style={{ contentVisibility: 'auto', containIntrinsicSize: `${thumbSize}px ${thumbSize + 40}px` }}
                         >
                             <div className="text-[10px] text-white/40 truncate w-full mb-1 text-center group-hover:text-white/80 transition-colors">
                                 {index + 1}

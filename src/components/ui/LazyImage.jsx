@@ -101,16 +101,23 @@ export const LazyImage = memo(({
             });
     }, [isVisible, src, loadedSrc, isHighPriority, onLoad, onError]);
 
-    // Reset when src changes
+    // Reset when src changes - batch updates to reduce renders
     useEffect(() => {
         const cached = getCached(src);
         if (cached) {
+            // Single batch update
             setLoadedSrc(cached);
             setIsLoading(false);
             setHasError(false);
-        } else {
+        } else if (src?.startsWith('http')) {
+            // Only reset if it's a web image that needs loading
             setLoadedSrc(null);
             setIsLoading(true);
+            setHasError(false);
+        } else {
+            // Local files don't need loading state
+            setLoadedSrc(src);
+            setIsLoading(false);
             setHasError(false);
         }
     }, [src]);

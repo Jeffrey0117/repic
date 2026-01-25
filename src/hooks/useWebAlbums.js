@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, startTransition } from 'react';
 
 const STORAGE_KEY = 'repic-web-albums';
 
@@ -170,9 +170,11 @@ export const useWebAlbums = () => {
     ));
   }, []);
 
-  // Select album
+  // Select album (use startTransition for smoother UI)
   const selectAlbum = useCallback((albumId) => {
-    setSelectedAlbumId(albumId);
+    startTransition(() => {
+      setSelectedAlbumId(albumId);
+    });
   }, []);
 
   // Reorder images in album (drag and drop)
