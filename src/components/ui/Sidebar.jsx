@@ -276,10 +276,10 @@ export const Sidebar = ({
                             ? (repicInfo?.url || '')
                             : `file://${file}?v=${cacheVersion}`;
 
-                    // Use cached thumbnail for local files, proxied URL for web
+                    // Use proxied URL for web, original URL for local
                     const imgSrc = isWeb
                         ? (proxiedUrls[fileUrl] || originalUrl)
-                        : (cachedThumbs[file] || originalUrl);
+                        : originalUrl;
 
                     // Check if image failed to load
                     const isFailed = isWeb && failedImages.has(fileUrl);
