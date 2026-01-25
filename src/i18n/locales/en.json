@@ -76,6 +76,7 @@
   "newAlbum": "New Album",
   "albumName": "Album name",
   "deleteAlbumConfirm": "Delete this album?",
+  "deleteImageConfirm": "Delete this image from the album?",
   "selectOrCreateAlbum": "Select or create an album",
   "emptyAlbum": "This album is empty",
   "pasteUrlHint": "Paste image URLs below to add images",

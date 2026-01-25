@@ -756,6 +756,18 @@ function App() {
         isEditing={isEditing}
         onToggleEdit={() => setIsEditing(!isEditing)}
         onClear={handleClear}
+        onDeleteAlbumImage={() => {
+          if (viewMode === 'album' && selectedAlbumId && albumImages[safeAlbumIndex]) {
+            const imageToDelete = albumImages[safeAlbumIndex];
+            if (confirm(t('deleteImageConfirm'))) {
+              removeAlbumImage(selectedAlbumId, imageToDelete.id);
+              // Navigate to previous image if deleting last, otherwise stay at current index
+              if (safeAlbumIndex >= albumImages.length - 1 && safeAlbumIndex > 0) {
+                setAlbumImageIndex(prev => prev - 1);
+              }
+            }
+          }
+        }}
         onSave={handleSave}
         onCopy={handleCopy}
         isCopying={isCopying}

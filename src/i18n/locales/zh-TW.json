@@ -76,6 +76,7 @@
   "newAlbum": "新增相簿",
   "albumName": "相簿名稱",
   "deleteAlbumConfirm": "確定刪除此相簿？",
+  "deleteImageConfirm": "確定從相簿刪除此圖片？",
   "selectOrCreateAlbum": "選擇或建立一個相簿",
   "emptyAlbum": "此相簿是空的",
   "pasteUrlHint": "在下方貼上圖片網址以新增圖片",

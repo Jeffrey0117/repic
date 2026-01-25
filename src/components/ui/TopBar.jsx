@@ -31,7 +31,7 @@ const PanelLeft = ({ size = 24, className = '' }) => (
     </svg>
 );
 
-export const TopBar = ({ currentPath, onOpenFolder, onRefresh, isEditing, onToggleEdit, onClear, onSave, onCopy, isCopying, onUpload, isUploading, uploadHistoryCount, onToggleUploadHistory, showInfoPanel, onToggleInfo, viewMode, onToggleViewMode, selectedAlbum, onAddAlbumImage, albumSidebarCollapsed, onToggleAlbumSidebar, onExportVirtual, hasImage }) => {
+export const TopBar = ({ currentPath, onOpenFolder, onRefresh, isEditing, onToggleEdit, onClear, onDeleteAlbumImage, onSave, onCopy, isCopying, onUpload, isUploading, uploadHistoryCount, onToggleUploadHistory, showInfoPanel, onToggleInfo, viewMode, onToggleViewMode, selectedAlbum, onAddAlbumImage, albumSidebarCollapsed, onToggleAlbumSidebar, onExportVirtual, hasImage }) => {
     const { t, language, setLanguage } = useI18n();
     const { theme, toggleTheme } = useTheme();
     const [urlInput, setUrlInput] = useState('');
@@ -158,7 +158,7 @@ export const TopBar = ({ currentPath, onOpenFolder, onRefresh, isEditing, onTogg
                 <ToolButton icon={Upload} title={t('upload')} onClick={onUpload} disabled={isUploading || viewMode === 'album'} loading={isUploading} theme={theme} />
                 <ToolButton icon={Layers} title={t('uploadHistory')} onClick={onToggleUploadHistory} badge={uploadHistoryCount} theme={theme} />
                 <ToolButton icon={FolderOutput} title={t('exportVirtual')} onClick={onExportVirtual} disabled={viewMode !== 'album' || !selectedAlbum?.images?.length} theme={theme} />
-                <ToolButton icon={Trash2} title={t('delete')} className="text-danger" onClick={onClear} disabled={viewMode === 'album'} theme={theme} />
+                <ToolButton icon={Trash2} title={t('delete')} className="text-danger" onClick={viewMode === 'album' ? onDeleteAlbumImage : onClear} disabled={!hasImage} theme={theme} />
             </div>
 
             {/* Right: Actions */}
