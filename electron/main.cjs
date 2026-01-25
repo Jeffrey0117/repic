@@ -38,6 +38,21 @@ function cleanupTempFiles() {
     }
 }
 
+// Extract og:image URL from HTML (for social media URLs that return HTML)
+function extractOgImage(html) {
+    // Try og:image first
+    const ogMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+        || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+    if (ogMatch) return ogMatch[1];
+
+    // Try twitter:image
+    const twitterMatch = html.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i)
+        || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i);
+    if (twitterMatch) return twitterMatch[1];
+
+    return null;
+}
+
 // Download image from URL to temp file (with cache)
 function downloadToTemp(url) {
     return new Promise((resolve, reject) => {
@@ -83,7 +98,7 @@ function downloadToTemp(url) {
         console.log('[downloadToTemp] Downloading:', url);
 
         const request = protocol.get(url, options, (response) => {
-            console.log('[downloadToTemp] Response status:', response.statusCode);
+            console.log('[downloadToTemp] Response status:', response.statusCode, 'content-type:', response.headers['content-type']);
 
             // Follow redirects
             if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
@@ -97,6 +112,26 @@ function downloadToTemp(url) {
 
             if (response.statusCode !== 200) {
                 reject(new Error(`HTTP ${response.statusCode}`));
+                return;
+            }
+
+            const contentType = response.headers['content-type'] || '';
+
+            // If response is HTML, try to extract og:image
+            if (contentType.includes('text/html')) {
+                console.log('[downloadToTemp] Got HTML, extracting og:image...');
+                let html = '';
+                response.on('data', chunk => html += chunk);
+                response.on('end', () => {
+                    const imageUrl = extractOgImage(html);
+                    if (imageUrl) {
+                        console.log('[downloadToTemp] Found og:image:', imageUrl);
+                        // Recursively download the actual image
+                        downloadToTemp(imageUrl).then(resolve).catch(reject);
+                    } else {
+                        reject(new Error('No image found in HTML'));
+                    }
+                });
                 return;
             }
 
