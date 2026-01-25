@@ -11,9 +11,14 @@ const electronAPI = window.electronAPI || null;
 // Check if file is a .repic virtual image
 const isRepicFile = (path) => path?.toLowerCase().endsWith('.repic');
 
+// Cache for proxied images (URL -> base64)
+const proxyCache = new Map();
+
 export const Sidebar = ({ files, currentIndex, onSelect, cacheVersion = 0, mode = 'local' }) => {
     // Cache for .repic file data (url + crop)
     const [repicData, setRepicData] = useState({});
+    // Cache for proxied images (when direct load fails)
+    const [proxiedUrls, setProxiedUrls] = useState({});
     const [width, setWidth] = useState(() => {
         const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
         if (saved) {
@@ -97,11 +102,14 @@ export const Sidebar = ({ files, currentIndex, onSelect, cacheVersion = 0, mode 
                     // Handle .repic files in local mode - use cached data
                     const isRepic = !isWeb && isRepicFile(file);
                     const repicInfo = isRepic ? repicData[file] : null;
-                    const imgSrc = isWeb
+                    const originalUrl = isWeb
                         ? fileUrl
                         : isRepic
                             ? (repicInfo?.url || '')
                             : `file://${file}?v=${cacheVersion}`;
+
+                    // Use proxied URL if available (for hotlink protected images)
+                    const imgSrc = (isWeb && proxiedUrls[fileUrl]) ? proxiedUrls[fileUrl] : originalUrl;
 
                     // Get crop data: from .repic file or from web album image object
                     const crop = isRepic
@@ -152,7 +160,16 @@ export const Sidebar = ({ files, currentIndex, onSelect, cacheVersion = 0, mode 
                                         loading="lazy"
                                         draggable={false}
                                         referrerPolicy="no-referrer"
-                                        crossOrigin="anonymous"
+                                        onError={async (e) => {
+                                            // If image fails to load and we haven't tried proxy yet
+                                            if (isWeb && originalUrl.startsWith('http') && !proxiedUrls[fileUrl] && electronAPI?.proxyImage) {
+                                                console.log('[Sidebar] Image failed, trying proxy:', originalUrl);
+                                                const result = await electronAPI.proxyImage(originalUrl);
+                                                if (result.success) {
+                                                    setProxiedUrls(prev => ({ ...prev, [fileUrl]: result.data }));
+                                                }
+                                            }
+                                        }}
                                     />
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center text-white/20 text-xs">

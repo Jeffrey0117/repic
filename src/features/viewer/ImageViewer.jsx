@@ -8,22 +8,21 @@ export const ImageViewer = ({ src, crop }) => {
     const containerRef = useRef(null);
     const imageRef = useRef(null);
 
-    // Debug: log crop
-    if (crop) {
-        console.log('[ImageViewer] Rendering with crop:', crop);
-        console.log('[ImageViewer] clipPath will be:', `inset(${crop.y}% ${100 - crop.x - crop.width}% ${100 - crop.y - crop.height}% ${crop.x}%)`);
-    }
-
     const [scale, setScale] = useState(1);
     const [position, setPosition] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+    const [proxiedSrc, setProxiedSrc] = useState(null);
 
-    // Reset zoom and position when image changes
+    // Reset zoom, position, and proxied src when image changes
     useEffect(() => {
         setScale(1);
         setPosition({ x: 0, y: 0 });
+        setProxiedSrc(null);
     }, [src]);
+
+    // Actual image source (use proxied if available)
+    const imageSrc = proxiedSrc || src;
 
     // Handle scroll wheel zoom - zoom toward mouse position
     const handleWheel = useCallback((e) => {
@@ -151,7 +150,7 @@ export const ImageViewer = ({ src, crop }) => {
             )}
 
             {/* Unsaved indicator */}
-            {src.startsWith('data:') && (
+            {imageSrc.startsWith('data:') && !proxiedSrc && (
                 <div className="absolute top-4 right-4 z-10 bg-primary/80 backdrop-blur-md text-[10px] text-white px-2 py-1 rounded-full uppercase tracking-widest font-bold shadow-lg">
                     Unsaved
                 </div>
@@ -159,7 +158,7 @@ export const ImageViewer = ({ src, crop }) => {
 
             <img
                 ref={imageRef}
-                src={src}
+                src={imageSrc}
                 alt="View"
                 className="block select-none rounded-md"
                 style={{
@@ -175,7 +174,16 @@ export const ImageViewer = ({ src, crop }) => {
                 }}
                 draggable={false}
                 referrerPolicy="no-referrer"
-                crossOrigin="anonymous"
+                onError={async () => {
+                    // If image fails to load and we haven't tried proxy yet
+                    if (src.startsWith('http') && !proxiedSrc && electronAPI?.proxyImage) {
+                        console.log('[ImageViewer] Image failed, trying proxy:', src);
+                        const result = await electronAPI.proxyImage(src);
+                        if (result.success) {
+                            setProxiedSrc(result.data);
+                        }
+                    }
+                }}
             />
         </div>
     );

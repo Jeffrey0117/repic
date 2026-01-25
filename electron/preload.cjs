@@ -212,5 +212,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
             return { success: false, error: 'Invalid image source' };
         }
         return await ipcRenderer.invoke('start-drag', { imageSrc, fileName });
+    },
+
+    // Proxy image download - bypass browser restrictions (for hotlink protected images)
+    proxyImage: async (url) => {
+        if (!url || typeof url !== 'string' || !url.startsWith('http')) {
+            return { success: false, error: 'Invalid URL' };
+        }
+        return await ipcRenderer.invoke('proxy-image', url);
     }
 });

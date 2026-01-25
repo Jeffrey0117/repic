@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog, nativeImage } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog, nativeImage, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -422,6 +422,29 @@ function setupIpcHandlers() {
         }
     });
 
+    // Proxy image download - bypass browser restrictions
+    ipcMain.handle('proxy-image', async (event, url) => {
+        try {
+            const filePath = await downloadToTemp(url);
+            // Read the file and return as base64
+            const buffer = fs.readFileSync(filePath);
+            const ext = path.extname(filePath).toLowerCase();
+            const mimeTypes = {
+                '.jpg': 'image/jpeg',
+                '.jpeg': 'image/jpeg',
+                '.png': 'image/png',
+                '.gif': 'image/gif',
+                '.webp': 'image/webp'
+            };
+            const mimeType = mimeTypes[ext] || 'image/jpeg';
+            const base64 = `data:${mimeType};base64,${buffer.toString('base64')}`;
+            return { success: true, data: base64 };
+        } catch (e) {
+            console.error('[proxy-image] Error:', e);
+            return { success: false, error: e.message };
+        }
+    });
+
     // Batch crop - save cropped image data to file
     ipcMain.handle('batch-crop-save', async (event, { filePath, base64Data, outputMode, originalPath, customDir }) => {
         console.log('[batch-crop-save] Received:', { filePath, outputMode, originalPath, customDir, hasBase64: !!base64Data });
@@ -484,6 +507,18 @@ app.whenReady().then(() => {
 
     // Clean up old temp files on startup
     cleanupTempFiles();
+
+    // Configure session to bypass third-party cookie restrictions
+    const ses = session.defaultSession;
+
+    // Remove Referer header and add necessary headers for image requests
+    ses.webRequest.onBeforeSendHeaders({ urls: ['*://*/*'] }, (details, callback) => {
+        // Remove Referer to bypass hotlink protection
+        delete details.requestHeaders['Referer'];
+        // Add headers that some sites require
+        details.requestHeaders['Accept'] = 'image/webp,image/apng,image/*,*/*;q=0.8';
+        callback({ requestHeaders: details.requestHeaders });
+    });
 
     setupIpcHandlers();
     createWindow();
