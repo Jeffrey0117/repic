@@ -99,15 +99,15 @@ Output: `release/` folder
 
 ## Roadmap
 
-### Phase 1 - Core UX
-- [ ] Remember last opened folder
-- [ ] Preload adjacent images (2-3 ahead/behind)
-- [ ] Paste image from clipboard (Ctrl+V)
-- [ ] Drag to reorder album images
+### Phase 1 - Core UX ✅
+- [x] Remember last opened folder
+- [x] Preload adjacent images (3 ahead/behind)
+- [x] Paste image from clipboard (Ctrl+V)
+- [x] Drag to reorder album images
 
 ### Phase 2 - Batch Operations
-- [ ] Batch download (multi-select → save all)
-- [ ] Batch upload (multi-select → upload all)
+- [x] Batch download (multi-select → save all)
+- [x] Batch upload (multi-select → upload all)
 - [ ] Batch virtualize (local → upload → .repic, option to delete local)
 - [ ] Batch materialize (.repic → download → local, option to delete .repic)
 
@@ -117,7 +117,7 @@ Output: `release/` folder
 - [ ] Offline cache for web album images
 
 ### Phase 4 - Advanced
-- [ ] Album import/export (JSON backup)
+- [x] Album import/export (JSON backup)
 - [ ] Sidebar position toggle (left / bottom)
 
 ---
