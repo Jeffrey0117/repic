@@ -12,8 +12,8 @@ const electronAPI = window.electronAPI || null;
 const isRepicFile = (path) => path?.toLowerCase().endsWith('.repic');
 
 export const Sidebar = ({ files, currentIndex, onSelect, cacheVersion = 0, mode = 'local' }) => {
-    // Cache for .repic file URLs
-    const [repicUrls, setRepicUrls] = useState({});
+    // Cache for .repic file data (url + crop)
+    const [repicData, setRepicData] = useState({});
     const [width, setWidth] = useState(() => {
         const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
         if (saved) {
@@ -53,27 +53,30 @@ export const Sidebar = ({ files, currentIndex, onSelect, cacheVersion = 0, mode 
         };
     }, [isResizing, width]);
 
-    // Load .repic file URLs for local mode
+    // Load .repic file data (url + crop) for local mode
+    // Reset cache when cacheVersion changes (after crop save)
     useEffect(() => {
         if (mode !== 'local' || !electronAPI) return;
 
-        const loadRepicUrls = async () => {
-            const newUrls = {};
+        // Clear cache and reload all repic files
+        const loadRepicData = async () => {
+            const newData = {};
             for (const file of files) {
-                if (isRepicFile(file) && !repicUrls[file]) {
+                if (isRepicFile(file)) {
                     const result = electronAPI.readFile(file);
                     if (result && typeof result === 'object' && result.url) {
-                        newUrls[file] = result.url;
+                        newData[file] = {
+                            url: result.url,
+                            crop: result.crop || null
+                        };
                     }
                 }
             }
-            if (Object.keys(newUrls).length > 0) {
-                setRepicUrls(prev => ({ ...prev, ...newUrls }));
-            }
+            setRepicData(newData);
         };
 
-        loadRepicUrls();
-    }, [files, mode]);
+        loadRepicData();
+    }, [files, mode, cacheVersion]);
 
     return (
         <div
@@ -91,13 +94,24 @@ export const Sidebar = ({ files, currentIndex, onSelect, cacheVersion = 0, mode 
                         ? (typeof file === 'string' ? file.split('/').pop()?.split('?')[0] : file.url?.split('/').pop()?.split('?')[0]) || `Image ${index + 1}`
                         : file.split(/[\\/]/).pop();
 
-                    // Handle .repic files in local mode - use cached URL
+                    // Handle .repic files in local mode - use cached data
                     const isRepic = !isWeb && isRepicFile(file);
+                    const repicInfo = isRepic ? repicData[file] : null;
                     const imgSrc = isWeb
                         ? fileUrl
                         : isRepic
-                            ? (repicUrls[file] || '')
+                            ? (repicInfo?.url || '')
                             : `file://${file}?v=${cacheVersion}`;
+
+                    // Get crop data: from .repic file or from web album image object
+                    const crop = isRepic
+                        ? repicInfo?.crop
+                        : (isWeb && typeof file === 'object' ? file.crop : null);
+
+                    // Calculate clip-path for cropped thumbnails
+                    const clipPath = crop
+                        ? `inset(${crop.y}% ${100 - crop.x - crop.width}% ${100 - crop.y - crop.height}% ${crop.x}%)`
+                        : undefined;
 
                     return (
                         <motion.div
@@ -131,6 +145,7 @@ export const Sidebar = ({ files, currentIndex, onSelect, cacheVersion = 0, mode 
                                         src={imgSrc}
                                         alt=""
                                         className="w-full h-full object-contain pointer-events-none"
+                                        style={clipPath ? { clipPath } : undefined}
                                         loading="lazy"
                                         draggable={false}
                                     />

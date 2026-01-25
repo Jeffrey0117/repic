@@ -225,6 +225,7 @@ function App() {
             const writeResult = await electronAPI.writeRepicFile(currentImage, updatedData);
             if (writeResult.success) {
               setLocalCrop(result.crop);
+              setCacheVersion(prev => prev + 1); // Refresh sidebar thumbnails
               setToast({ visible: true, message: t('cropSaved') });
             } else {
               console.error('[handleCropComplete] Failed to save crop:', writeResult.error);
