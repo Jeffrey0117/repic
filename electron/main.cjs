@@ -661,22 +661,33 @@ function setupIpcHandlers() {
         return { success: false, error: 'Window not found' };
     });
 
-    // Scrape images from webpage URL
-    ipcMain.handle('scrape-images', async (event, url) => {
+    // Scrape images from webpage URL - helper function for recursive calls
+    const scrapeImagesFromUrl = async (url, redirectCount = 0) => {
+        // Prevent infinite redirect loops
+        if (redirectCount > 5) {
+            return { success: false, error: 'Too many redirects' };
+        }
+
         console.log('[scrape-images] Scraping:', url);
         try {
             const protocol = url.startsWith('https') ? https : http;
             const urlObj = new URL(url);
 
-            const options = {
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                    'Accept-Language': 'en-US,en;q=0.9'
-                }
+            // Build headers with site-specific cookies
+            const headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7'
             };
 
-            return new Promise((resolve, reject) => {
+            // PTT requires over18 cookie for adult content boards
+            if (urlObj.hostname.includes('ptt.cc')) {
+                headers['Cookie'] = 'over18=1';
+            }
+
+            const options = { headers };
+
+            return new Promise((resolve) => {
                 const request = protocol.get(url, options, (response) => {
                     // Follow redirects
                     if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
@@ -684,7 +695,8 @@ function setupIpcHandlers() {
                             ? response.headers.location
                             : new URL(response.headers.location, url).href;
                         console.log('[scrape-images] Redirecting to:', redirectUrl);
-                        ipcRenderer?.invoke('scrape-images', redirectUrl).then(resolve).catch(reject);
+                        // Recursively call the helper function
+                        scrapeImagesFromUrl(redirectUrl, redirectCount + 1).then(resolve);
                         return;
                     }
 
@@ -762,6 +774,11 @@ function setupIpcHandlers() {
             console.error('[scrape-images] Error:', e.message);
             return { success: false, error: e.message };
         }
+    };
+
+    // Scrape images from webpage URL - IPC handler
+    ipcMain.handle('scrape-images', async (event, url) => {
+        return scrapeImagesFromUrl(url);
     });
 
     // Batch crop - save cropped image data to file

@@ -143,5 +143,9 @@
   "confirmDelete": "Delete Confirmation",
   "download": "Download",
   "album": "Album",
-  "local": "Local"
+  "local": "Local",
+  "noImagesFound": "No images found on this page",
+  "scrapeFailed": "Scrape failed: {error}",
+  "webpageNotSupported": "Webpage drop not supported (drop images instead)",
+  "rename": "Rename"
 }

@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from '../../lib/motion';
 import {
   RotateCcw,
   Scissors,
@@ -16,6 +15,7 @@ import useI18n from '../../hooks/useI18n';
 /**
  * Floating toolbar at the bottom center of the screen
  * Auto-hides when mouse is idle, shows on hover
+ * Uses CSS transitions for smooth, flicker-free animation
  */
 export const FloatingToolbar = ({
   onRefresh,
@@ -42,7 +42,6 @@ export const FloatingToolbar = ({
 
   const [isVisible, setIsVisible] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const timeoutRef = useRef(null);
   const toolbarRef = useRef(null);
 
   // Auto-hide logic - show near bottom, hide when leave toolbar
@@ -53,19 +52,13 @@ export const FloatingToolbar = ({
 
       if (isNearBottom || isHovered) {
         setIsVisible(true);
-        clearTimeout(timeoutRef.current);
       } else if (!isHovered) {
-        // Hide immediately
         setIsVisible(false);
       }
     };
 
     window.addEventListener('mousemove', handleMouseMove);
-
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      clearTimeout(timeoutRef.current);
-    };
+    return () => window.removeEventListener('mousemove', handleMouseMove);
   }, [isHovered]);
 
   // Keep visible when editing
@@ -84,110 +77,96 @@ export const FloatingToolbar = ({
     : !hasImage;
 
   return (
-    <AnimatePresence>
-      {isVisible && (
-        <motion.div
-          key="floating-toolbar"
-          ref={toolbarRef}
-          initial={{ y: 16, opacity: 0, scale: 0.92 }}
-          animate={{
-            y: 0,
-            opacity: 1,
-            scale: 1,
-            transition: { type: 'spring', stiffness: 400, damping: 28 }
-          }}
-          exit={{
-            y: 8,
-            opacity: 0,
-            scale: 0.96,
-            transition: { duration: 0.1, ease: 'easeIn' }
-          }}
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
-          className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-2 py-1.5 rounded-2xl border shadow-2xl backdrop-blur-xl ${
-            isDark
-              ? 'bg-black/70 border-white/10'
-              : 'bg-white/80 border-black/10'
-          }`}
-        >
-        <div className="flex items-center gap-0.5">
-          <ToolButton
-            icon={RotateCcw}
-            title={t('refresh')}
-            onClick={onRefresh}
-            theme={theme}
-          />
+    <div
+      ref={toolbarRef}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-2 py-1.5 rounded-2xl border shadow-2xl backdrop-blur-xl transition-all duration-150 ease-out ${
+        isDark
+          ? 'bg-black/70 border-white/10'
+          : 'bg-white/80 border-black/10'
+      } ${
+        isVisible
+          ? 'opacity-100 translate-y-0 scale-100'
+          : 'opacity-0 translate-y-2 scale-95 pointer-events-none'
+      }`}
+    >
+      <div className="flex items-center gap-0.5">
+        <ToolButton
+          icon={RotateCcw}
+          title={t('refresh')}
+          onClick={onRefresh}
+          theme={theme}
+        />
 
-          <Divider theme={theme} />
+        <Divider theme={theme} />
 
-          <ToolButton
-            icon={Scissors}
-            title={t('editArea')}
-            onClick={onToggleEdit}
-            active={isEditing}
-            disabled={!hasImage}
-            theme={theme}
-          />
+        <ToolButton
+          icon={Scissors}
+          title={t('editArea')}
+          onClick={onToggleEdit}
+          active={isEditing}
+          disabled={!hasImage}
+          theme={theme}
+        />
 
-          <ToolButton
-            icon={Copy}
-            title={t('copyToClipboard')}
-            onClick={onCopy}
-            disabled={isCopying || !hasImage}
-            loading={isCopying}
-            theme={theme}
-          />
+        <ToolButton
+          icon={Copy}
+          title={t('copyToClipboard')}
+          onClick={onCopy}
+          disabled={isCopying || !hasImage}
+          loading={isCopying}
+          theme={theme}
+        />
 
-          <ToolButton
-            icon={Download}
-            title={t('download')}
-            onClick={onSave}
-            disabled={!hasImage}
-            theme={theme}
-          />
+        <ToolButton
+          icon={Download}
+          title={t('download')}
+          onClick={onSave}
+          disabled={!hasImage}
+          theme={theme}
+        />
 
-          <Divider theme={theme} />
+        <Divider theme={theme} />
 
-          <ToolButton
-            icon={Upload}
-            title={t('upload')}
-            onClick={onUpload}
-            disabled={isUploading || viewMode === 'album'}
-            loading={isUploading}
-            theme={theme}
-          />
+        <ToolButton
+          icon={Upload}
+          title={t('upload')}
+          onClick={onUpload}
+          disabled={isUploading || viewMode === 'album'}
+          loading={isUploading}
+          theme={theme}
+        />
 
-          <ToolButton
-            icon={Layers}
-            title={t('uploadHistory')}
-            onClick={onToggleUploadHistory}
-            badge={uploadHistoryCount}
-            theme={theme}
-          />
+        <ToolButton
+          icon={Layers}
+          title={t('uploadHistory')}
+          onClick={onToggleUploadHistory}
+          badge={uploadHistoryCount}
+          theme={theme}
+        />
 
-          <Divider theme={theme} />
+        <Divider theme={theme} />
 
-          <ToolButton
-            icon={FolderOutput}
-            title={t('exportVirtual')}
-            onClick={onExportVirtual}
-            disabled={viewMode !== 'album' || !selectedAlbum?.images?.length}
-            theme={theme}
-          />
+        <ToolButton
+          icon={FolderOutput}
+          title={t('exportVirtual')}
+          onClick={onExportVirtual}
+          disabled={viewMode !== 'album' || !selectedAlbum?.images?.length}
+          theme={theme}
+        />
 
-          <ToolButton
-            icon={Trash2}
-            title={deleteTitle}
-            onClick={onDelete}
-            disabled={isDeleteDisabled}
-            danger
-            badge={isMultiSelectMode ? selectedImageIds?.size || 0 : 0}
-            theme={theme}
-          />
-        </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+        <ToolButton
+          icon={Trash2}
+          title={deleteTitle}
+          onClick={onDelete}
+          disabled={isDeleteDisabled}
+          danger
+          badge={isMultiSelectMode ? selectedImageIds?.size || 0 : 0}
+          theme={theme}
+        />
+      </div>
+    </div>
   );
 };
 

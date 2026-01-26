@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FolderOpen, Trash2, X, Check } from '../../components/icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import useI18n from '../../hooks/useI18n';
@@ -18,7 +18,9 @@ export const AlbumSidebar = ({
   onImportAlbums,
   onExportAlbum,
   onContextMenu,
-  isVisible = true
+  isVisible = true,
+  renamingAlbumId = null,
+  onClearRenaming
 }) => {
   const { t } = useI18n();
   const { theme } = useTheme();
@@ -65,6 +67,19 @@ export const AlbumSidebar = ({
       }
     }
   };
+
+  // Handle external rename trigger (from context menu)
+  useEffect(() => {
+    if (renamingAlbumId) {
+      const album = albums.find(a => a.id === renamingAlbumId);
+      if (album) {
+        setEditingId(album.id);
+        setEditingName(album.name);
+      }
+      // Clear the trigger
+      onClearRenaming?.();
+    }
+  }, [renamingAlbumId, albums, onClearRenaming]);
 
   // CSS transition for smooth open/close - same as InfoPanel
   const sidebarStyle = {

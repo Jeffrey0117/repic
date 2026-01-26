@@ -64,11 +64,117 @@ const HelpCircle = ({ size = 24, className = '' }) => (
     </svg>
 );
 
-export const TopBar = ({ currentPath, onOpenFolder, showInfoPanel, onToggleInfo, viewMode, onToggleViewMode, selectedAlbum, onAddAlbumImage, albumSidebarCollapsed, onToggleAlbumSidebar, sidebarPosition, onToggleSidebarPosition, onAbout }) => {
+// Settings/Gear icon
+const Settings = ({ size = 24, className = '' }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+        <circle cx="12" cy="12" r="3" />
+    </svg>
+);
+
+// Toolbar icons
+const RotateCcw = ({ size = 24, className = '' }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+        <path d="M3 3v5h5" />
+    </svg>
+);
+
+const Scissors = ({ size = 24, className = '' }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <circle cx="6" cy="6" r="3" />
+        <path d="M8.12 8.12 12 12" />
+        <path d="M20 4 8.12 15.88" />
+        <circle cx="6" cy="18" r="3" />
+        <path d="M14.8 14.8 20 20" />
+    </svg>
+);
+
+const Copy = ({ size = 24, className = '' }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+        <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+    </svg>
+);
+
+const Download = ({ size = 24, className = '' }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+        <polyline points="7 10 12 15 17 10" />
+        <line x1="12" x2="12" y1="15" y2="3" />
+    </svg>
+);
+
+const Upload = ({ size = 24, className = '' }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+        <polyline points="17 8 12 3 7 8" />
+        <line x1="12" x2="12" y1="3" y2="15" />
+    </svg>
+);
+
+const Layers = ({ size = 24, className = '' }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z" />
+        <path d="m22 12.5-8.58 3.91a2 2 0 0 1-1.66 0L2 12.5" />
+        <path d="m22 17.5-8.58 3.91a2 2 0 0 1-1.66 0L2 17.5" />
+    </svg>
+);
+
+const FolderOutput = ({ size = 24, className = '' }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M2 7.5V5c0-1.1.9-2 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-3.5" />
+        <path d="M2 13h10" />
+        <path d="m5 10-3 3 3 3" />
+    </svg>
+);
+
+const Trash2 = ({ size = 24, className = '' }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M3 6h18" />
+        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+        <line x1="10" x2="10" y1="11" y2="17" />
+        <line x1="14" x2="14" y1="11" y2="17" />
+    </svg>
+);
+
+export const TopBar = ({
+    currentPath,
+    onOpenFolder,
+    showInfoPanel,
+    onToggleInfo,
+    viewMode,
+    onToggleViewMode,
+    selectedAlbum,
+    onAddAlbumImage,
+    albumSidebarCollapsed,
+    onToggleAlbumSidebar,
+    sidebarPosition,
+    onToggleSidebarPosition,
+    onAbout,
+    // Toolbar props
+    onRefresh,
+    onToggleEdit,
+    isEditing,
+    onCopy,
+    isCopying,
+    onUpload,
+    isUploading,
+    onToggleUploadHistory,
+    uploadHistoryCount,
+    onExportVirtual,
+    onDelete,
+    onSave,
+    hasImage,
+    isMultiSelectMode,
+    selectedImageIds
+}) => {
     const { t, language, setLanguage } = useI18n();
     const { theme, toggleTheme } = useTheme();
     const [urlInput, setUrlInput] = useState('');
     const [showUrlModal, setShowUrlModal] = useState(false);
+    const [showSettingsMenu, setShowSettingsMenu] = useState(false);
     const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(false);
 
     // Load initial always on top state
@@ -181,6 +287,22 @@ export const TopBar = ({ currentPath, onOpenFolder, showInfoPanel, onToggleInfo,
                     <span className={`text-xs font-medium max-w-[150px] truncate ${theme === 'dark' ? 'text-white/80' : 'text-gray-700'}`}>{folderName}</span>
                 </div>
 
+                {/* Mode toggle - moved to left side */}
+                <button
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                        viewMode === 'album'
+                            ? 'bg-primary/20 text-primary'
+                            : theme === 'dark'
+                                ? 'bg-white/5 hover:bg-white/10 text-white/70'
+                                : 'bg-black/5 hover:bg-black/10 text-gray-600'
+                    }`}
+                    onClick={onToggleViewMode}
+                    title={t('webAlbum')}
+                >
+                    <Album size={14} />
+                    <span>{viewMode === 'album' ? t('album') : t('local')}</span>
+                </button>
+
                 {/* Add URL button - Album mode only */}
                 {viewMode === 'album' && selectedAlbum && (
                     <button
@@ -197,27 +319,82 @@ export const TopBar = ({ currentPath, onOpenFolder, showInfoPanel, onToggleInfo,
                 )}
             </div>
 
+            {/* Center: Main Toolbar */}
+            <div className={`flex items-center gap-0.5 px-2 py-1 rounded-xl border ${
+                theme === 'dark'
+                    ? 'bg-white/5 border-white/10'
+                    : 'bg-black/5 border-black/10'
+            }`}>
+                <ToolbarButton
+                    icon={RotateCcw}
+                    title={t('refresh')}
+                    onClick={onRefresh}
+                    theme={theme}
+                />
+                <ToolbarButton
+                    icon={Scissors}
+                    title={t('editArea')}
+                    onClick={onToggleEdit}
+                    active={isEditing}
+                    disabled={!hasImage}
+                    theme={theme}
+                />
+                <ToolbarButton
+                    icon={Copy}
+                    title={t('copyToClipboard')}
+                    onClick={onCopy}
+                    disabled={isCopying || !hasImage}
+                    loading={isCopying}
+                    theme={theme}
+                />
+                <ToolbarButton
+                    icon={Download}
+                    title={t('download')}
+                    onClick={onSave}
+                    disabled={!hasImage}
+                    theme={theme}
+                />
+
+                <div className={`w-px h-5 mx-1 ${theme === 'dark' ? 'bg-white/10' : 'bg-black/10'}`} />
+
+                <ToolbarButton
+                    icon={Upload}
+                    title={t('upload')}
+                    onClick={onUpload}
+                    disabled={isUploading || viewMode === 'album'}
+                    loading={isUploading}
+                    theme={theme}
+                />
+                <ToolbarButton
+                    icon={Layers}
+                    title={t('uploadHistory')}
+                    onClick={onToggleUploadHistory}
+                    badge={uploadHistoryCount}
+                    theme={theme}
+                />
+
+                <div className={`w-px h-5 mx-1 ${theme === 'dark' ? 'bg-white/10' : 'bg-black/10'}`} />
+
+                <ToolbarButton
+                    icon={FolderOutput}
+                    title={t('exportVirtual')}
+                    onClick={onExportVirtual}
+                    disabled={viewMode !== 'album' || !selectedAlbum?.images?.length}
+                    theme={theme}
+                />
+                <ToolbarButton
+                    icon={Trash2}
+                    title={isMultiSelectMode && selectedImageIds?.size > 0 ? `${t('delete')} (${selectedImageIds.size})` : t('delete')}
+                    onClick={onDelete}
+                    disabled={isMultiSelectMode ? selectedImageIds?.size === 0 : !hasImage}
+                    danger
+                    badge={isMultiSelectMode ? selectedImageIds?.size || 0 : 0}
+                    theme={theme}
+                />
+            </div>
+
             {/* Right: Actions */}
             <div className="flex items-center gap-1">
-                {/* Mode toggle */}
-                <Button
-                    variant="ghost"
-                    className={`h-9 px-3 rounded-lg flex items-center gap-2 transition-all ${
-                        viewMode === 'album'
-                            ? 'bg-primary/20 text-primary'
-                            : theme === 'dark'
-                                ? 'hover:bg-white/10 text-white/70'
-                                : 'hover:bg-black/10 text-gray-600'
-                    }`}
-                    onClick={onToggleViewMode}
-                    title={t('webAlbum')}
-                >
-                    <Album size={18} />
-                    <span className="text-xs font-medium">{viewMode === 'album' ? t('album') : t('local')}</span>
-                </Button>
-
-                <div className={`w-px h-6 mx-1 ${theme === 'dark' ? 'bg-white/10' : 'bg-black/10'}`} />
-
                 {/* Always on top toggle */}
                 <button
                     className={`h-9 w-9 p-0 rounded-lg transition-colors flex items-center justify-center ${
@@ -230,23 +407,6 @@ export const TopBar = ({ currentPath, onOpenFolder, showInfoPanel, onToggleInfo,
                 >
                     <Pin size={18} />
                 </button>
-                <Button
-                    variant="ghost"
-                    className={`h-9 w-9 p-0 rounded-lg hover:bg-black/10 dark:hover:bg-white/5 ${theme === 'dark' ? 'text-white/70' : 'text-gray-600'}`}
-                    onClick={toggleTheme}
-                    title={theme === 'dark' ? t('lightMode') : t('darkMode')}
-                >
-                    {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-                </Button>
-                <Button
-                    variant="ghost"
-                    className={`h-9 px-2 rounded-lg hover:bg-black/10 dark:hover:bg-white/5 flex gap-2 ${theme === 'dark' ? 'text-white/70' : 'text-gray-600'}`}
-                    onClick={() => setLanguage(nextLang)}
-                    title={t('changeLanguage')}
-                >
-                    <Globe size={18} />
-                    <span className="text-xs font-bold">{langDisplay}</span>
-                </Button>
                 <Button
                     variant="ghost"
                     className={`h-9 w-9 p-0 rounded-lg transition-all ${showInfoPanel ? 'bg-primary/20 text-primary' : `hover:bg-black/10 dark:hover:bg-white/5 ${theme === 'dark' ? 'text-white/70' : 'text-gray-600'}`}`}
@@ -263,14 +423,73 @@ export const TopBar = ({ currentPath, onOpenFolder, showInfoPanel, onToggleInfo,
                 >
                     {sidebarPosition === 'left' ? <PanelBottom size={18} /> : <PanelLeft size={18} />}
                 </Button>
-                <Button
-                    variant="ghost"
-                    className={`h-9 w-9 p-0 rounded-lg hover:bg-black/10 dark:hover:bg-white/5 ${theme === 'dark' ? 'text-white/70' : 'text-gray-600'}`}
-                    onClick={onAbout}
-                    title={t('about')}
-                >
-                    <HelpCircle size={18} />
-                </Button>
+
+                <div className={`w-px h-6 mx-1 ${theme === 'dark' ? 'bg-white/10' : 'bg-black/10'}`} />
+
+                {/* Settings dropdown */}
+                <div className="relative">
+                    <Button
+                        variant="ghost"
+                        className={`h-9 w-9 p-0 rounded-lg hover:bg-black/10 dark:hover:bg-white/5 ${
+                            showSettingsMenu
+                                ? 'bg-primary/20 text-primary'
+                                : theme === 'dark' ? 'text-white/70' : 'text-gray-600'
+                        }`}
+                        onClick={() => setShowSettingsMenu(!showSettingsMenu)}
+                        title={t('settings')}
+                    >
+                        <Settings size={18} />
+                    </Button>
+                    {showSettingsMenu && (
+                        <>
+                            <div
+                                className="fixed inset-0 z-40"
+                                onClick={() => setShowSettingsMenu(false)}
+                            />
+                            <div className={`absolute right-0 top-full mt-2 z-50 w-48 py-1 rounded-xl border shadow-xl ${
+                                theme === 'dark'
+                                    ? 'bg-surface border-white/10'
+                                    : 'bg-white border-black/10'
+                            }`}>
+                                <button
+                                    onClick={() => { toggleTheme(); setShowSettingsMenu(false); }}
+                                    className={`w-full flex items-center gap-3 px-3 py-2 text-sm transition-colors ${
+                                        theme === 'dark'
+                                            ? 'hover:bg-white/10 text-white/80'
+                                            : 'hover:bg-black/5 text-gray-700'
+                                    }`}
+                                >
+                                    {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+                                    <span>{theme === 'dark' ? t('lightMode') : t('darkMode')}</span>
+                                </button>
+                                <button
+                                    onClick={() => { setLanguage(nextLang); setShowSettingsMenu(false); }}
+                                    className={`w-full flex items-center gap-3 px-3 py-2 text-sm transition-colors ${
+                                        theme === 'dark'
+                                            ? 'hover:bg-white/10 text-white/80'
+                                            : 'hover:bg-black/5 text-gray-700'
+                                    }`}
+                                >
+                                    <Globe size={16} />
+                                    <span>{t('changeLanguage')}</span>
+                                    <span className={`ml-auto text-xs font-bold ${theme === 'dark' ? 'text-white/50' : 'text-gray-400'}`}>{langDisplay}</span>
+                                </button>
+                                <div className={`my-1 h-px ${theme === 'dark' ? 'bg-white/10' : 'bg-black/10'}`} />
+                                <button
+                                    onClick={() => { onAbout(); setShowSettingsMenu(false); }}
+                                    className={`w-full flex items-center gap-3 px-3 py-2 text-sm transition-colors ${
+                                        theme === 'dark'
+                                            ? 'hover:bg-white/10 text-white/80'
+                                            : 'hover:bg-black/5 text-gray-700'
+                                    }`}
+                                >
+                                    <HelpCircle size={16} />
+                                    <span>{t('about')}</span>
+                                </button>
+                            </div>
+                        </>
+                    )}
+                </div>
             </div>
 
             {/* URL Input Modal - rendered via Portal to avoid transform issues */}
@@ -371,6 +590,51 @@ export const TopBar = ({ currentPath, onOpenFolder, showInfoPanel, onToggleInfo,
                 document.body
             )}
         </motion.div>
+    );
+};
+
+// Toolbar button component
+const ToolbarButton = ({
+    icon: Icon,
+    title,
+    onClick,
+    active = false,
+    disabled = false,
+    loading = false,
+    danger = false,
+    badge = 0,
+    theme = 'dark'
+}) => {
+    const isDark = theme === 'dark';
+
+    return (
+        <button
+            onClick={onClick}
+            title={title}
+            disabled={disabled}
+            className={`p-2 rounded-lg transition-all relative ${
+                disabled
+                    ? 'opacity-40 cursor-not-allowed'
+                    : active
+                        ? 'bg-primary/20 text-primary'
+                        : danger
+                            ? isDark
+                                ? 'hover:bg-red-500/20 text-red-400 hover:text-red-300'
+                                : 'hover:bg-red-50 text-red-500 hover:text-red-600'
+                            : isDark
+                                ? 'hover:bg-white/10 text-white/60 hover:text-white'
+                                : 'hover:bg-black/10 text-gray-500 hover:text-gray-700'
+            }`}
+        >
+            <Icon size={18} className={loading ? 'animate-pulse' : ''} />
+            {badge > 0 && (
+                <span className={`absolute -top-0.5 -right-0.5 text-white text-[9px] rounded-full min-w-[14px] h-3.5 flex items-center justify-center font-bold px-0.5 ${
+                    danger ? 'bg-red-500' : 'bg-primary'
+                }`}>
+                    {badge > 99 ? '99+' : badge}
+                </span>
+            )}
+        </button>
     );
 };
 

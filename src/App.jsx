@@ -12,7 +12,6 @@ import { ExportVirtualDialog } from './components/ui/ExportVirtualDialog';
 import { ConfirmDialog } from './components/ui/ConfirmDialog';
 import { AboutDialog } from './components/ui/AboutDialog';
 import { ContextMenu } from './components/ui/ContextMenu';
-import { FloatingToolbar } from './components/ui/FloatingToolbar';
 import { Copy, Download, FolderOutput, Trash2, Pencil } from './components/icons';
 import { prepareSingleExport } from './utils/repicFile';
 import { AlbumSidebar } from './features/album/AlbumSidebar';
@@ -121,6 +120,9 @@ function App() {
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState({ isOpen: false, position: { x: 0, y: 0 }, target: null });
+
+  // Album rename state (triggered from context menu)
+  const [renamingAlbumId, setRenamingAlbumId] = useState(null);
 
   // Sync file system image with local view only when currentImage or cacheVersion changes
   useEffect(() => {
@@ -368,17 +370,16 @@ function App() {
           addAlbumImages(selectedAlbumId, result.images);
           setAlbumImageIndex(newIndex);
           setToast({ visible: true, message: t('imagesAdded', { count: result.images.length }) || `已加入 ${result.images.length} 張圖片` });
+        } else if (result.error) {
+          // Scraping failed with error
+          setToast({ visible: true, message: t('scrapeFailed') || `抓取失敗: ${result.error}` });
         } else {
-          // No images found, try adding the URL as-is (might be an image without extension)
-          addAlbumImage(selectedAlbumId, imageUrl);
-          setAlbumImageIndex(selectedAlbum?.images?.length || 0);
-          setToast({ visible: true, message: t('imageAdded') || 'Image added!' });
+          // No images found on the page
+          setToast({ visible: true, message: t('noImagesFound') || '此網頁沒有找到圖片' });
         }
       } else {
-        // No Electron API, add URL as-is
-        addAlbumImage(selectedAlbumId, imageUrl);
-        setAlbumImageIndex(selectedAlbum?.images?.length || 0);
-        setToast({ visible: true, message: t('imageAdded') || 'Image added!' });
+        // No Electron API - show error for webpage URLs
+        setToast({ visible: true, message: t('webpageNotSupported') || '不支援網頁拖放（請拖放圖片）' });
       }
     }
   }, [viewMode, selectedAlbumId, addAlbumImage, addAlbumImages, selectedAlbum?.images?.length, t, looksLikeImageUrl]);
@@ -1350,6 +1351,47 @@ function App() {
           localStorage.setItem('repic-sidebar-position', newPos);
         }}
         onAbout={() => setShowAboutDialog(true)}
+        // Toolbar props
+        onRefresh={handleRefresh}
+        onToggleEdit={() => setIsEditing(!isEditing)}
+        isEditing={isEditing}
+        onCopy={handleCopy}
+        isCopying={isCopying}
+        onUpload={handleUpload}
+        isUploading={isUploading}
+        onToggleUploadHistory={() => setShowUploadHistory(!showUploadHistory)}
+        uploadHistoryCount={uploadHistory.length}
+        onExportVirtual={() => setShowExportDialog(true)}
+        onDelete={async () => {
+          if (isMultiSelectMode && selectedImageIds?.size > 0) {
+            handleBatchDelete();
+          } else if (viewMode === 'album' && selectedAlbumId && albumImages[safeAlbumIndex]) {
+            const imageToDelete = albumImages[safeAlbumIndex];
+            const confirmed = await confirm(t('deleteImageConfirm'), {
+              title: t('confirmDelete'),
+              confirmText: t('delete'),
+              cancelText: t('cancel'),
+              danger: true
+            });
+            if (confirmed) {
+              removeAlbumImage(selectedAlbumId, imageToDelete.id);
+              setSelectedImageIds(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(imageToDelete.id);
+                return newSet;
+              });
+              if (safeAlbumIndex >= albumImages.length - 1 && safeAlbumIndex > 0) {
+                setAlbumImageIndex(prev => prev - 1);
+              }
+            }
+          } else {
+            handleClear();
+          }
+        }}
+        onSave={handleSave}
+        hasImage={!!(localImage || currentAlbumImage || virtualImageData?.url)}
+        isMultiSelectMode={viewMode === 'album' && isMultiSelectMode}
+        selectedImageIds={selectedImageIds}
       />
 
       {/* 2. Main Content Area */}
@@ -1386,6 +1428,8 @@ function App() {
             }}
             onContextMenu={handleAlbumContextMenu}
             isVisible={!albumSidebarCollapsed}
+            renamingAlbumId={renamingAlbumId}
+            onClearRenaming={() => setRenamingAlbumId(null)}
           />
         )}
 
@@ -1673,52 +1717,6 @@ function App() {
         )}
       </AnimatePresence>
 
-      {/* Floating Toolbar */}
-      <FloatingToolbar
-        onRefresh={handleRefresh}
-        onToggleEdit={() => setIsEditing(!isEditing)}
-        isEditing={isEditing}
-        onCopy={handleCopy}
-        isCopying={isCopying}
-        onUpload={handleUpload}
-        isUploading={isUploading}
-        onToggleUploadHistory={() => setShowUploadHistory(!showUploadHistory)}
-        uploadHistoryCount={uploadHistory.length}
-        onExportVirtual={() => setShowExportDialog(true)}
-        onDelete={async () => {
-          if (isMultiSelectMode && selectedImageIds?.size > 0) {
-            handleBatchDelete();
-          } else if (viewMode === 'album' && selectedAlbumId && albumImages[safeAlbumIndex]) {
-            const imageToDelete = albumImages[safeAlbumIndex];
-            const confirmed = await confirm(t('deleteImageConfirm'), {
-              title: t('confirmDelete'),
-              confirmText: t('delete'),
-              cancelText: t('cancel'),
-              danger: true
-            });
-            if (confirmed) {
-              removeAlbumImage(selectedAlbumId, imageToDelete.id);
-              setSelectedImageIds(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(imageToDelete.id);
-                return newSet;
-              });
-              if (safeAlbumIndex >= albumImages.length - 1 && safeAlbumIndex > 0) {
-                setAlbumImageIndex(prev => prev - 1);
-              }
-            }
-          } else {
-            handleClear();
-          }
-        }}
-        onSave={handleSave}
-        hasImage={!!(localImage || currentAlbumImage || virtualImageData?.url)}
-        viewMode={viewMode}
-        selectedAlbum={selectedAlbum}
-        isMultiSelectMode={viewMode === 'album' && isMultiSelectMode}
-        selectedImageIds={selectedImageIds}
-      />
-
       {/* Context Menu */}
       <ContextMenu
         isOpen={contextMenu.isOpen}
@@ -1769,6 +1767,18 @@ function App() {
             }
           ]
           : contextMenu.target?.type === 'album' ? [
+            {
+              label: t('rename'),
+              icon: Pencil,
+              onClick: () => {
+                const album = contextMenu.target?.album;
+                if (album) {
+                  // Trigger rename mode in AlbumSidebar
+                  // We'll use a ref or state to communicate this
+                  setRenamingAlbumId(album.id);
+                }
+              }
+            },
             {
               label: t('exportVirtual'),
               icon: FolderOutput,

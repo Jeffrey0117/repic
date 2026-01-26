@@ -143,5 +143,9 @@
   "confirmDelete": "刪除確認",
   "download": "下載",
   "album": "相簿",
-  "local": "本地"
+  "local": "本地",
+  "noImagesFound": "此網頁沒有找到圖片",
+  "scrapeFailed": "抓取失敗：{error}",
+  "webpageNotSupported": "不支援網頁拖放（請拖放圖片）",
+  "rename": "重新命名"
 }

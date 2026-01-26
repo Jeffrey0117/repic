@@ -8,6 +8,7 @@ export const SaveToolbar = ({ onSaveReplace, onSaveAs, onDiscard, isLocalFile })
 
     return (
         <motion.div
+            key="save-toolbar"
             initial={{ y: 100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 100, opacity: 0 }}
