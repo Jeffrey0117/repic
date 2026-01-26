@@ -2,9 +2,14 @@ package main
 
 import (
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"image"
+	"image/gif"
+	"image/jpeg"
+	_ "image/png" // PNG decode support
 	"io"
 	"net/http"
 	"net/url"
@@ -14,6 +19,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	_ "golang.org/x/image/webp" // WebP decode support
+	"golang.org/x/image/draw"
 )
 
 // Shared HTTP client with connection pooling - THE KEY TO WINNING
@@ -26,12 +34,12 @@ func init() {
 			MinVersion: tls.VersionTLS12,
 			MaxVersion: tls.VersionTLS13,
 		},
-		MaxIdleConns:        100,             // Keep many connections ready
-		MaxIdleConnsPerHost: 10,              // Per-host pool
-		MaxConnsPerHost:     10,              // Limit per host to be polite
-		IdleConnTimeout:     90 * time.Second,
-		DisableCompression:  false,
-		TLSHandshakeTimeout: 10 * time.Second,
+		MaxIdleConns:          100,
+		MaxIdleConnsPerHost:   10,
+		MaxConnsPerHost:       10,
+		IdleConnTimeout:       90 * time.Second,
+		DisableCompression:    false,
+		TLSHandshakeTimeout:   10 * time.Second,
 		ResponseHeaderTimeout: 10 * time.Second,
 	}
 
@@ -72,6 +80,26 @@ type DownloadResult struct {
 	Error     string         `json:"error,omitempty"`
 }
 
+type ThumbnailItem struct {
+	Source    string `json:"source"`
+	Output    string `json:"output,omitempty"`
+	Base64    string `json:"base64,omitempty"`
+	Success   bool   `json:"success"`
+	Error     string `json:"error,omitempty"`
+	Width     int    `json:"width,omitempty"`
+	Height    int    `json:"height,omitempty"`
+}
+
+type ThumbnailResult struct {
+	Success   bool            `json:"success"`
+	Total     int             `json:"total"`
+	Completed int             `json:"completed"`
+	Failed    int             `json:"failed"`
+	Items     []ThumbnailItem `json:"items"`
+	Duration  int64           `json:"duration_ms"`
+	Error     string          `json:"error,omitempty"`
+}
+
 func main() {
 	// Scrape mode
 	urlFlag := flag.String("url", "", "URL to scrape")
@@ -79,12 +107,27 @@ func main() {
 	// Download mode
 	downloadFlag := flag.Bool("download", false, "Enable batch download mode")
 	urlsFlag := flag.String("urls", "", "Comma-separated URLs to download")
-	outputFlag := flag.String("output", "", "Output directory for downloads")
-	concurrencyFlag := flag.Int("concurrency", 8, "Max concurrent downloads")
+	outputFlag := flag.String("output", "", "Output directory for downloads/thumbnails")
+	concurrencyFlag := flag.Int("concurrency", 8, "Max concurrent operations")
+
+	// Thumbnail mode
+	thumbnailFlag := flag.Bool("thumbnail", false, "Enable thumbnail generation mode")
+	filesFlag := flag.String("files", "", "Comma-separated file paths for thumbnails")
+	sizeFlag := flag.Int("size", 200, "Thumbnail max dimension")
+	base64Flag := flag.Bool("base64", false, "Output thumbnails as base64 instead of files")
 
 	flag.Parse()
 
-	if *downloadFlag {
+	if *thumbnailFlag {
+		// Thumbnail generation mode
+		if *filesFlag == "" {
+			outputThumbnailError("files are required for thumbnail mode")
+			return
+		}
+		files := strings.Split(*filesFlag, ",")
+		result := batchThumbnails(files, *outputFlag, *sizeFlag, *concurrencyFlag, *base64Flag)
+		json.NewEncoder(os.Stdout).Encode(result)
+	} else if *downloadFlag {
 		// Batch download mode
 		if *urlsFlag == "" || *outputFlag == "" {
 			outputDownloadError("urls and output are required for download mode")
@@ -102,7 +145,7 @@ func main() {
 		}
 		outputScrapeSuccess(images)
 	} else {
-		outputScrapeError("url or download mode required")
+		outputScrapeError("url, download, or thumbnail mode required")
 	}
 }
 
@@ -121,21 +164,213 @@ func outputDownloadError(msg string) {
 	json.NewEncoder(os.Stdout).Encode(result)
 }
 
-// batchDownload - The main attraction. Go's goroutines + connection pooling
+func outputThumbnailError(msg string) {
+	result := ThumbnailResult{Success: false, Error: msg}
+	json.NewEncoder(os.Stdout).Encode(result)
+}
+
+// ============ THUMBNAIL MODE ============
+
+func batchThumbnails(files []string, outputDir string, maxSize int, concurrency int, outputBase64 bool) ThumbnailResult {
+	startTime := time.Now()
+
+	// Create output dir if not base64 mode
+	if !outputBase64 && outputDir != "" {
+		if err := os.MkdirAll(outputDir, 0755); err != nil {
+			return ThumbnailResult{Success: false, Error: err.Error()}
+		}
+	}
+
+	sem := make(chan struct{}, concurrency)
+	results := make(chan ThumbnailItem, len(files))
+	var wg sync.WaitGroup
+
+	for _, file := range files {
+		file = strings.TrimSpace(file)
+		if file == "" {
+			continue
+		}
+
+		wg.Add(1)
+		go func(filePath string) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			item := generateThumbnail(filePath, outputDir, maxSize, outputBase64)
+			results <- item
+		}(file)
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	var items []ThumbnailItem
+	completed := 0
+	failed := 0
+
+	for item := range results {
+		items = append(items, item)
+		if item.Success {
+			completed++
+		} else {
+			failed++
+		}
+	}
+
+	duration := time.Since(startTime).Milliseconds()
+
+	return ThumbnailResult{
+		Success:   failed == 0,
+		Total:     len(files),
+		Completed: completed,
+		Failed:    failed,
+		Items:     items,
+		Duration:  duration,
+	}
+}
+
+func generateThumbnail(source string, outputDir string, maxSize int, outputBase64 bool) ThumbnailItem {
+	item := ThumbnailItem{Source: source}
+
+	// Open image file
+	var reader io.ReadCloser
+	var err error
+
+	if strings.HasPrefix(source, "http://") || strings.HasPrefix(source, "https://") {
+		// Download from URL
+		resp, err := sharedClient.Get(source)
+		if err != nil {
+			item.Error = err.Error()
+			return item
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != 200 {
+			item.Error = fmt.Sprintf("HTTP %d", resp.StatusCode)
+			return item
+		}
+		reader = resp.Body
+	} else {
+		// Local file
+		f, err := os.Open(source)
+		if err != nil {
+			item.Error = err.Error()
+			return item
+		}
+		defer f.Close()
+		reader = f
+	}
+
+	// Decode image
+	img, format, err := image.Decode(reader)
+	if err != nil {
+		item.Error = fmt.Sprintf("decode: %v", err)
+		return item
+	}
+
+	// Calculate thumbnail dimensions
+	bounds := img.Bounds()
+	origW := bounds.Dx()
+	origH := bounds.Dy()
+
+	var newW, newH int
+	if origW > origH {
+		if origW > maxSize {
+			newW = maxSize
+			newH = int(float64(origH) * float64(maxSize) / float64(origW))
+		} else {
+			newW = origW
+			newH = origH
+		}
+	} else {
+		if origH > maxSize {
+			newH = maxSize
+			newW = int(float64(origW) * float64(maxSize) / float64(origH))
+		} else {
+			newW = origW
+			newH = origH
+		}
+	}
+
+	// Create thumbnail using high-quality CatmullRom scaling
+	thumb := image.NewRGBA(image.Rect(0, 0, newW, newH))
+	draw.CatmullRom.Scale(thumb, thumb.Bounds(), img, bounds, draw.Over, nil)
+
+	item.Width = newW
+	item.Height = newH
+
+	if outputBase64 {
+		// Encode to base64
+		var buf strings.Builder
+		buf.WriteString("data:image/jpeg;base64,")
+
+		// Create a pipe to encode directly to base64
+		pr, pw := io.Pipe()
+		go func() {
+			jpeg.Encode(pw, thumb, &jpeg.Options{Quality: 80})
+			pw.Close()
+		}()
+
+		data, err := io.ReadAll(pr)
+		if err != nil {
+			item.Error = fmt.Sprintf("encode: %v", err)
+			return item
+		}
+
+		item.Base64 = "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(data)
+		item.Success = true
+	} else {
+		// Save to file
+		filename := filepath.Base(source)
+		// Change extension to .jpg
+		ext := filepath.Ext(filename)
+		if ext != "" {
+			filename = filename[:len(filename)-len(ext)] + ".jpg"
+		} else {
+			filename = filename + ".jpg"
+		}
+
+		outputPath := filepath.Join(outputDir, "thumb_"+filename)
+
+		f, err := os.Create(outputPath)
+		if err != nil {
+			item.Error = err.Error()
+			return item
+		}
+		defer f.Close()
+
+		// Use appropriate encoder based on format
+		if format == "gif" {
+			err = gif.Encode(f, thumb, nil)
+		} else {
+			err = jpeg.Encode(f, thumb, &jpeg.Options{Quality: 85})
+		}
+
+		if err != nil {
+			item.Error = fmt.Sprintf("encode: %v", err)
+			return item
+		}
+
+		item.Output = outputPath
+		item.Success = true
+	}
+
+	return item
+}
+
+// ============ DOWNLOAD MODE ============
+
 func batchDownload(urls []string, outputDir string, concurrency int) DownloadResult {
 	startTime := time.Now()
 
-	// Ensure output directory exists
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		return DownloadResult{Success: false, Error: err.Error()}
 	}
 
-	// Semaphore for concurrency control
 	sem := make(chan struct{}, concurrency)
-
-	// Results channel
 	results := make(chan DownloadItem, len(urls))
-
 	var wg sync.WaitGroup
 
 	for i, rawURL := range urls {
@@ -147,16 +382,11 @@ func batchDownload(urls []string, outputDir string, concurrency int) DownloadRes
 		wg.Add(1)
 		go func(idx int, imageURL string) {
 			defer wg.Done()
-
-			// Acquire semaphore
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			// Generate filename
 			filename := generateFilename(imageURL, idx)
 			outputPath := filepath.Join(outputDir, filename)
-
-			// Download with streaming
 			size, err := downloadFile(imageURL, outputPath)
 
 			item := DownloadItem{
@@ -176,13 +406,11 @@ func batchDownload(urls []string, outputDir string, concurrency int) DownloadRes
 		}(i, rawURL)
 	}
 
-	// Close results channel when all done
 	go func() {
 		wg.Wait()
 		close(results)
 	}()
 
-	// Collect results
 	var items []DownloadItem
 	completed := 0
 	failed := 0
@@ -208,14 +436,12 @@ func batchDownload(urls []string, outputDir string, concurrency int) DownloadRes
 	}
 }
 
-// downloadFile - Stream directly to disk, no memory buffering
 func downloadFile(imageURL, outputPath string) (int64, error) {
 	req, err := http.NewRequest("GET", imageURL, nil)
 	if err != nil {
 		return 0, err
 	}
 
-	// Set headers
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 	req.Header.Set("Accept", "image/webp,image/apng,image/*,*/*;q=0.8")
 	req.Header.Set("Accept-Language", "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7")
@@ -230,41 +456,35 @@ func downloadFile(imageURL, outputPath string) (int64, error) {
 		return 0, fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 
-	// Check content type
 	contentType := resp.Header.Get("Content-Type")
 	if !strings.Contains(contentType, "image") && contentType != "" {
 		return 0, fmt.Errorf("not an image: %s", contentType)
 	}
 
-	// Create output file
 	out, err := os.Create(outputPath)
 	if err != nil {
 		return 0, err
 	}
 	defer out.Close()
 
-	// Stream copy - THIS IS KEY: no memory buffering, direct to disk
 	written, err := io.Copy(out, resp.Body)
 	if err != nil {
-		os.Remove(outputPath) // Cleanup partial file
+		os.Remove(outputPath)
 		return 0, err
 	}
 
 	return written, nil
 }
 
-// generateFilename - Extract filename from URL or generate one
 func generateFilename(imageURL string, index int) string {
 	parsed, err := url.Parse(imageURL)
 	if err != nil {
 		return fmt.Sprintf("image_%d.jpg", index)
 	}
 
-	// Get the path component
 	urlPath := parsed.Path
 	filename := filepath.Base(urlPath)
 
-	// If no valid extension, add one
 	ext := strings.ToLower(filepath.Ext(filename))
 	validExts := map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".gif": true, ".webp": true}
 
@@ -272,7 +492,6 @@ func generateFilename(imageURL string, index int) string {
 		filename = fmt.Sprintf("image_%d.jpg", index)
 	}
 
-	// Sanitize filename
 	filename = strings.ReplaceAll(filename, ":", "_")
 	filename = strings.ReplaceAll(filename, "?", "_")
 	filename = strings.ReplaceAll(filename, "&", "_")
@@ -280,7 +499,7 @@ func generateFilename(imageURL string, index int) string {
 	return filename
 }
 
-// ============ SCRAPE MODE (existing functionality) ============
+// ============ SCRAPE MODE ============
 
 func scrapeImages(targetURL string) ([]string, error) {
 	parsedURL, err := url.Parse(targetURL)
@@ -293,12 +512,10 @@ func scrapeImages(targetURL string) ([]string, error) {
 		return nil, err
 	}
 
-	// Set headers
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
 	req.Header.Set("Accept-Language", "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7")
 
-	// PTT needs over18 cookie
 	if strings.Contains(parsedURL.Host, "ptt.cc") {
 		req.Header.Set("Cookie", "over18=1")
 	}
@@ -328,20 +545,13 @@ func extractImages(html string, baseURL *url.URL) []string {
 	imageSet := make(map[string]bool)
 	var mu sync.Mutex
 
-	// Patterns to extract
 	patterns := []string{
-		// img src
 		`<img[^>]+src=["']([^"']+)["']`,
-		// srcset
 		`srcset=["']([^"']+)["']`,
-		// og:image
 		`<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']`,
 		`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']`,
-		// background-image
 		`background(?:-image)?:\s*url\(["']?([^"')]+)["']?\)`,
-		// Direct image links (common on forums like PTT)
 		`href=["'](https?://[^"']+\.(?:jpg|jpeg|png|gif|webp))["']`,
-		// imgur links
 		`(https?://(?:i\.)?imgur\.com/[a-zA-Z0-9]+\.(?:jpg|jpeg|png|gif|webp))`,
 	}
 
@@ -350,7 +560,6 @@ func extractImages(html string, baseURL *url.URL) []string {
 		matches := re.FindAllStringSubmatch(html, -1)
 		for _, match := range matches {
 			if len(match) > 1 {
-				// For srcset, split by comma and get URLs
 				if strings.Contains(pattern, "srcset") {
 					srcsetParts := strings.Split(match[1], ",")
 					for _, part := range srcsetParts {
@@ -367,7 +576,6 @@ func extractImages(html string, baseURL *url.URL) []string {
 		}
 	}
 
-	// Convert set to slice
 	var images []string
 	for img := range imageSet {
 		images = append(images, img)
@@ -377,14 +585,12 @@ func extractImages(html string, baseURL *url.URL) []string {
 }
 
 func addImage(imageSet map[string]bool, mu *sync.Mutex, imgURL string, baseURL *url.URL) {
-	// Normalize URL
 	imgURL = strings.TrimSpace(imgURL)
 
 	if imgURL == "" {
 		return
 	}
 
-	// Skip data URLs and tiny tracking images
 	if strings.HasPrefix(imgURL, "data:") ||
 		strings.Contains(imgURL, "1x1") ||
 		strings.Contains(imgURL, "pixel") ||
@@ -393,17 +599,14 @@ func addImage(imageSet map[string]bool, mu *sync.Mutex, imgURL string, baseURL *
 		return
 	}
 
-	// Handle protocol-relative URLs
 	if strings.HasPrefix(imgURL, "//") {
 		imgURL = "https:" + imgURL
 	}
 
-	// Handle relative URLs
 	if strings.HasPrefix(imgURL, "/") {
 		imgURL = baseURL.Scheme + "://" + baseURL.Host + imgURL
 	}
 
-	// Skip non-http URLs
 	if !strings.HasPrefix(imgURL, "http") {
 		return
 	}

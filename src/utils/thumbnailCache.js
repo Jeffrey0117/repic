@@ -151,6 +151,42 @@ export const generateThumbnail = (imageSrc) => {
   });
 };
 
+// Batch generate thumbnails using Go (faster than Canvas)
+export const batchGenerateThumbnails = async (sources) => {
+  const electronAPI = window.electronAPI;
+
+  if (electronAPI?.batchThumbnails) {
+    try {
+      const result = await electronAPI.batchThumbnails(sources, { size: THUMB_SIZE, base64: true });
+      if (result && result.completed > 0) {
+        // Build a map of source -> base64
+        const thumbnailMap = {};
+        for (const item of result.items) {
+          if (item.success && item.base64) {
+            thumbnailMap[item.source] = item.base64;
+          }
+        }
+        console.log(`[ThumbnailCache] Go generated ${result.completed}/${result.total} thumbnails in ${result.duration_ms}ms`);
+        return thumbnailMap;
+      }
+    } catch (e) {
+      console.error('[ThumbnailCache] Go batch failed:', e);
+    }
+  }
+
+  // Fallback: generate one by one with Canvas
+  console.log('[ThumbnailCache] Using Canvas fallback');
+  const thumbnailMap = {};
+  for (const src of sources) {
+    try {
+      thumbnailMap[src] = await generateThumbnail(src);
+    } catch (e) {
+      console.warn('[ThumbnailCache] Canvas failed for:', src);
+    }
+  }
+  return thumbnailMap;
+};
+
 // Clear all cache
 export const clearCache = async () => {
   try {

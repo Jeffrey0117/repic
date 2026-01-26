@@ -249,5 +249,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
             return { success: false, error: 'Invalid output directory' };
         }
         return await ipcRenderer.invoke('batch-download-images', { urls, outputDir, concurrency });
+    },
+
+    // Batch thumbnail generation (uses Go for speed)
+    batchThumbnails: async (files, options = {}) => {
+        if (!Array.isArray(files) || files.length === 0) {
+            return { success: false, error: 'No files provided' };
+        }
+        const { outputDir, size = 200, concurrency = 8, base64 = true } = options;
+        return await ipcRenderer.invoke('batch-thumbnails', { files, outputDir, size, concurrency, base64 });
     }
 });

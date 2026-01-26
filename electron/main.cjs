@@ -941,6 +941,91 @@ function setupIpcHandlers() {
         };
     });
 
+    // Batch thumbnail generation with Go (faster than Canvas)
+    const batchThumbnailsWithGo = (files, outputDir, size = 200, concurrency = 8, base64 = true) => {
+        return new Promise((resolve) => {
+            const scraperPath = path.join(__dirname, '..', 'scraper', 'scraper.exe');
+
+            if (!fs.existsSync(scraperPath)) {
+                console.log('[batch-thumbnails] Go processor not found');
+                resolve(null);
+                return;
+            }
+
+            console.log('[batch-thumbnails] Using Go for', files.length, 'images');
+            const startTime = Date.now();
+
+            const args = [
+                '--thumbnail',
+                '--files', files.join(','),
+                '--size', String(size),
+                '--concurrency', String(concurrency)
+            ];
+
+            if (base64) {
+                args.push('--base64');
+            } else if (outputDir) {
+                args.push('--output', outputDir);
+            }
+
+            const proc = spawn(scraperPath, args);
+            let stdout = '';
+            let stderr = '';
+
+            proc.stdout.on('data', (data) => {
+                stdout += data.toString();
+            });
+
+            proc.stderr.on('data', (data) => {
+                stderr += data.toString();
+            });
+
+            proc.on('close', (code) => {
+                const duration = Date.now() - startTime;
+                if (code === 0 && stdout) {
+                    try {
+                        const result = JSON.parse(stdout);
+                        console.log(`[batch-thumbnails] Go completed: ${result.completed}/${result.total} in ${duration}ms`);
+                        resolve(result);
+                    } catch (e) {
+                        console.error('[batch-thumbnails] Parse error:', e);
+                        resolve(null);
+                    }
+                } else {
+                    console.log('[batch-thumbnails] Go failed:', stderr || `exit code ${code}`);
+                    resolve(null);
+                }
+            });
+
+            proc.on('error', (err) => {
+                console.error('[batch-thumbnails] Spawn error:', err);
+                resolve(null);
+            });
+
+            // Timeout after 60 seconds
+            setTimeout(() => {
+                proc.kill();
+                console.log('[batch-thumbnails] Timeout');
+                resolve(null);
+            }, 60000);
+        });
+    };
+
+    // Batch thumbnail IPC handler
+    ipcMain.handle('batch-thumbnails', async (event, { files, outputDir, size, concurrency, base64 }) => {
+        console.log('[batch-thumbnails] Request:', files.length, 'images');
+
+        // Try Go first
+        const goResult = await batchThumbnailsWithGo(files, outputDir, size || 200, concurrency || 8, base64 !== false);
+        if (goResult && goResult.completed > 0) {
+            return goResult;
+        }
+
+        // Fallback: return null, let frontend use Canvas
+        console.log('[batch-thumbnails] Falling back to frontend Canvas');
+        return { success: false, error: 'Go processor unavailable' };
+    });
+
     // Scrape images from webpage URL - IPC handler
     ipcMain.handle('scrape-images', async (event, url) => {
         // Try Go scraper first
