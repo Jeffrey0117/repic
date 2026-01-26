@@ -59,6 +59,7 @@ function App() {
     removeImage: removeAlbumImage,
     updateImageCrop,
     reorderImages,
+    updateAlbumImages,
     exportAlbums,
     importAlbums
   } = useWebAlbums();
@@ -716,8 +717,8 @@ function App() {
     }
 
     // Update album
-    updateAlbum(selectedAlbum.id, { images });
-  }, [selectedAlbum, selectedImageIds, updateAlbum]);
+    updateAlbumImages(selectedAlbum.id, images);
+  }, [selectedAlbum, selectedImageIds, updateAlbumImages]);
 
   // Move selected images down
   const handleMoveDown = useCallback(() => {
@@ -738,8 +739,8 @@ function App() {
     }
 
     // Update album
-    updateAlbum(selectedAlbum.id, { images });
-  }, [selectedAlbum, selectedImageIds, updateAlbum]);
+    updateAlbumImages(selectedAlbum.id, images);
+  }, [selectedAlbum, selectedImageIds, updateAlbumImages]);
 
   // Batch download selected images (uses Go for speed)
   const handleBatchDownload = useCallback(async () => {

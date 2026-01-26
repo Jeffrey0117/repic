@@ -274,6 +274,14 @@ export const useWebAlbums = () => {
     }));
   }, []);
 
+  // Update album images directly (for batch operations like move up/down)
+  const updateAlbumImages = useCallback((albumId, newImages) => {
+    setAlbums(prev => prev.map(album => {
+      if (album.id !== albumId) return album;
+      return { ...album, images: newImages };
+    }));
+  }, []);
+
   // Export all albums to JSON (excludes soft-deleted images)
   const exportAlbums = useCallback(() => {
     // Clean export: remove deleted images entirely
@@ -339,6 +347,7 @@ export const useWebAlbums = () => {
     updateImageCrop,
     clearImageCrop,
     reorderImages,
+    updateAlbumImages,
     exportAlbums,
     importAlbums
   };
