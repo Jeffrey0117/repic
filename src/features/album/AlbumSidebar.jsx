@@ -183,12 +183,12 @@ export const AlbumSidebar = ({
                   <div className={`text-xs mt-1 ${theme === 'dark' ? 'text-white/40' : 'text-gray-400'}`}>
                     {album.images.length} {t('images')}
                   </div>
-                  {/* Delete button - shows context menu */}
+                  {/* Delete button */}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (onContextMenu) {
-                        onContextMenu(e, album);
+                      if (onDeleteAlbum) {
+                        onDeleteAlbum(album.id);
                       }
                     }}
                     className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity ${
