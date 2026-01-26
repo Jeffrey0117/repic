@@ -115,6 +115,7 @@ func main() {
 	filesFlag := flag.String("files", "", "Comma-separated file paths for thumbnails")
 	sizeFlag := flag.Int("size", 200, "Thumbnail max dimension")
 	base64Flag := flag.Bool("base64", false, "Output thumbnails as base64 instead of files")
+	streamFlag := flag.Bool("stream", false, "Stream results as NDJSON (one item per line)")
 
 	flag.Parse()
 
@@ -125,8 +126,13 @@ func main() {
 			return
 		}
 		files := strings.Split(*filesFlag, ",")
-		result := batchThumbnails(files, *outputFlag, *sizeFlag, *concurrencyFlag, *base64Flag)
-		json.NewEncoder(os.Stdout).Encode(result)
+		if *streamFlag {
+			// Streaming mode: output each item immediately as it completes
+			batchThumbnailsStreaming(files, *outputFlag, *sizeFlag, *concurrencyFlag, *base64Flag)
+		} else {
+			result := batchThumbnails(files, *outputFlag, *sizeFlag, *concurrencyFlag, *base64Flag)
+			json.NewEncoder(os.Stdout).Encode(result)
+		}
 	} else if *downloadFlag {
 		// Batch download mode
 		if *urlsFlag == "" || *outputFlag == "" {
@@ -170,6 +176,69 @@ func outputThumbnailError(msg string) {
 }
 
 // ============ THUMBNAIL MODE ============
+
+// Streaming version: output each item immediately as NDJSON
+func batchThumbnailsStreaming(files []string, outputDir string, maxSize int, concurrency int, outputBase64 bool) {
+	startTime := time.Now()
+	encoder := json.NewEncoder(os.Stdout)
+
+	// Create output dir if not base64 mode
+	if !outputBase64 && outputDir != "" {
+		if err := os.MkdirAll(outputDir, 0755); err != nil {
+			encoder.Encode(ThumbnailItem{Source: "", Error: err.Error()})
+			return
+		}
+	}
+
+	sem := make(chan struct{}, concurrency)
+	results := make(chan ThumbnailItem, len(files))
+	var wg sync.WaitGroup
+
+	for _, file := range files {
+		file = strings.TrimSpace(file)
+		if file == "" {
+			continue
+		}
+
+		wg.Add(1)
+		go func(filePath string) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			item := generateThumbnail(filePath, outputDir, maxSize, outputBase64)
+			results <- item
+		}(file)
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	completed := 0
+	failed := 0
+
+	// Stream each result immediately as it arrives
+	for item := range results {
+		encoder.Encode(item) // Output one JSON line per item
+		if item.Success {
+			completed++
+		} else {
+			failed++
+		}
+	}
+
+	// Final summary line (type: "summary")
+	duration := time.Since(startTime).Milliseconds()
+	encoder.Encode(map[string]interface{}{
+		"type":        "summary",
+		"total":       len(files),
+		"completed":   completed,
+		"failed":      failed,
+		"duration_ms": duration,
+	})
+}
 
 func batchThumbnails(files []string, outputDir string, maxSize int, concurrency int, outputBase64 bool) ThumbnailResult {
 	startTime := time.Now()

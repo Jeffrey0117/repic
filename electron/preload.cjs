@@ -258,5 +258,41 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
         const { outputDir, size = 200, concurrency = 8, base64 = true } = options;
         return await ipcRenderer.invoke('batch-thumbnails', { files, outputDir, size, concurrency, base64 });
+    },
+
+    // Streaming thumbnail generation - returns immediately, calls onProgress for each thumbnail
+    batchThumbnailsStream: async (files, options = {}) => {
+        if (!Array.isArray(files) || files.length === 0) {
+            return { success: false, error: 'No files provided' };
+        }
+        const { size = 200, concurrency = 8, onProgress } = options;
+        const requestId = `thumb-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+        // Set up listener for streaming results
+        if (onProgress) {
+            const handler = (_event, data) => {
+                if (data.requestId === requestId && data.item) {
+                    onProgress(data.item);
+                }
+            };
+            ipcRenderer.on('thumbnail-ready', handler);
+
+            // Return cleanup function
+            setTimeout(() => {
+                ipcRenderer.removeListener('thumbnail-ready', handler);
+            }, 120000); // Auto-cleanup after 2 minutes
+        }
+
+        return await ipcRenderer.invoke('batch-thumbnails-stream', { files, size, concurrency, requestId });
+    },
+
+    // Listen for thumbnail stream events (alternative API)
+    onThumbnailReady: (callback) => {
+        ipcRenderer.on('thumbnail-ready', (_event, data) => callback(data));
+    },
+
+    // Remove thumbnail listener
+    offThumbnailReady: (callback) => {
+        ipcRenderer.removeListener('thumbnail-ready', callback);
     }
 });

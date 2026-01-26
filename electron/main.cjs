@@ -780,7 +780,7 @@ function setupIpcHandlers() {
     // Try Go scraper first (faster), fallback to Node.js
     const scrapeWithGo = (url) => {
         return new Promise((resolve) => {
-            const scraperPath = path.join(__dirname, '..', 'scraper', 'scraper.exe');
+            const scraperPath = path.join(__dirname, '..', 'scraper', 'repic-scraper.exe');
 
             // Check if Go scraper exists
             if (!fs.existsSync(scraperPath)) {
@@ -834,7 +834,7 @@ function setupIpcHandlers() {
     // Batch download with Go (faster than Node.js Promise.all)
     const batchDownloadWithGo = (urls, outputDir, concurrency = 8) => {
         return new Promise((resolve) => {
-            const scraperPath = path.join(__dirname, '..', 'scraper', 'scraper.exe');
+            const scraperPath = path.join(__dirname, '..', 'scraper', 'repic-scraper.exe');
 
             if (!fs.existsSync(scraperPath)) {
                 console.log('[batch-download] Go downloader not found');
@@ -944,7 +944,7 @@ function setupIpcHandlers() {
     // Batch thumbnail generation with Go (faster than Canvas)
     const batchThumbnailsWithGo = (files, outputDir, size = 200, concurrency = 8, base64 = true) => {
         return new Promise((resolve) => {
-            const scraperPath = path.join(__dirname, '..', 'scraper', 'scraper.exe');
+            const scraperPath = path.join(__dirname, '..', 'scraper', 'repic-scraper.exe');
 
             if (!fs.existsSync(scraperPath)) {
                 console.log('[batch-thumbnails] Go processor not found');
@@ -1011,7 +1011,7 @@ function setupIpcHandlers() {
         });
     };
 
-    // Batch thumbnail IPC handler
+    // Batch thumbnail IPC handler (legacy - waits for all)
     ipcMain.handle('batch-thumbnails', async (event, { files, outputDir, size, concurrency, base64 }) => {
         console.log('[batch-thumbnails] Request:', files.length, 'images');
 
@@ -1024,6 +1024,71 @@ function setupIpcHandlers() {
         // Fallback: return null, let frontend use Canvas
         console.log('[batch-thumbnails] Falling back to frontend Canvas');
         return { success: false, error: 'Go processor unavailable' };
+    });
+
+    // Streaming thumbnail generation - returns immediately, sends results via IPC events
+    ipcMain.handle('batch-thumbnails-stream', async (event, { files, size, concurrency, requestId }) => {
+        const scraperPath = path.join(__dirname, '..', 'scraper', 'repic-scraper.exe');
+
+        if (!fs.existsSync(scraperPath)) {
+            console.log('[batch-thumbnails-stream] Go processor not found');
+            return { success: false, error: 'Go processor not found' };
+        }
+
+        console.log('[batch-thumbnails-stream] Starting stream for', files.length, 'images');
+
+        const args = [
+            '--thumbnail',
+            '--stream',  // Enable streaming mode
+            '--files', files.join(','),
+            '--size', String(size || 200),
+            '--concurrency', String(concurrency || 8),
+            '--base64'
+        ];
+
+        const proc = spawn(scraperPath, args);
+        let buffer = '';
+
+        proc.stdout.on('data', (data) => {
+            buffer += data.toString();
+            // Process complete lines (NDJSON)
+            const lines = buffer.split('\n');
+            buffer = lines.pop(); // Keep incomplete line in buffer
+
+            for (const line of lines) {
+                if (!line.trim()) continue;
+                try {
+                    const item = JSON.parse(line);
+                    // Send each item to renderer immediately
+                    event.sender.send('thumbnail-ready', { requestId, item });
+                } catch (e) {
+                    console.error('[batch-thumbnails-stream] Parse error:', e.message);
+                }
+            }
+        });
+
+        proc.stderr.on('data', (data) => {
+            console.error('[batch-thumbnails-stream] stderr:', data.toString());
+        });
+
+        proc.on('close', (code) => {
+            // Process remaining buffer
+            if (buffer.trim()) {
+                try {
+                    const item = JSON.parse(buffer);
+                    event.sender.send('thumbnail-ready', { requestId, item });
+                } catch (e) {}
+            }
+            console.log('[batch-thumbnails-stream] Complete, exit code:', code);
+        });
+
+        proc.on('error', (err) => {
+            console.error('[batch-thumbnails-stream] Spawn error:', err);
+            event.sender.send('thumbnail-ready', { requestId, item: { type: 'error', error: err.message } });
+        });
+
+        // Don't wait for completion - return immediately
+        return { success: true, started: true };
     });
 
     // Scrape images from webpage URL - IPC handler

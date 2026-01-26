@@ -150,5 +150,8 @@
   "noImagesFound": "此網頁沒有找到圖片",
   "scrapeFailed": "抓取失敗：{error}",
   "webpageNotSupported": "不支援網頁拖放（請拖放圖片）",
-  "rename": "重新命名"
+  "rename": "重新命名",
+  "scrapeConfirmTitle": "抓取網頁圖片",
+  "scrapeConfirmMessage": "將抓取此網頁的所有圖片",
+  "scrapeImages": "抓取"
 }

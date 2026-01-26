@@ -361,29 +361,40 @@ function App() {
       setAlbumImageIndex(selectedAlbum?.images?.length || 0);
       setToast({ visible: true, message: t('imageAdded') || 'Image added!' });
     } else {
-      // Webpage URL - try to scrape images
+      // Webpage URL detected - ask user for confirmation first
       const electronAPI = getElectronAPI();
-      if (electronAPI?.scrapeImages) {
-        setToast({ visible: true, message: t('scraping') || '正在抓取圖片...' });
-        const result = await electronAPI.scrapeImages(imageUrl);
-        if (result.success && result.images?.length > 0) {
-          const newIndex = selectedAlbum?.images?.length || 0;
-          addAlbumImages(selectedAlbumId, result.images);
-          setAlbumImageIndex(newIndex);
-          setToast({ visible: true, message: t('imagesAdded', { count: result.images.length }) || `已加入 ${result.images.length} 張圖片` });
-        } else if (result.error) {
-          // Scraping failed with error
-          setToast({ visible: true, message: t('scrapeFailed') || `抓取失敗: ${result.error}` });
-        } else {
-          // No images found on the page
-          setToast({ visible: true, message: t('noImagesFound') || '此網頁沒有找到圖片' });
-        }
-      } else {
-        // No Electron API - show error for webpage URLs
+      if (!electronAPI?.scrapeImages) {
         setToast({ visible: true, message: t('webpageNotSupported') || '不支援網頁拖放（請拖放圖片）' });
+        return;
+      }
+
+      // Truncate URL for display if too long
+      const displayUrl = imageUrl.length > 60 ? imageUrl.slice(0, 57) + '...' : imageUrl;
+      const confirmMessage = `${t('scrapeConfirmMessage')}\n\n${displayUrl}`;
+
+      const confirmed = await confirm(confirmMessage, {
+        title: t('scrapeConfirmTitle'),
+        confirmText: t('scrapeImages'),
+        cancelText: t('cancel')
+      });
+
+      if (!confirmed) return;
+
+      // User confirmed - proceed with scraping
+      setToast({ visible: true, message: t('scraping') || '正在抓取圖片...' });
+      const result = await electronAPI.scrapeImages(imageUrl);
+      if (result.success && result.images?.length > 0) {
+        const newIndex = selectedAlbum?.images?.length || 0;
+        addAlbumImages(selectedAlbumId, result.images);
+        setAlbumImageIndex(newIndex);
+        setToast({ visible: true, message: t('imagesAdded', { count: result.images.length }) || `已加入 ${result.images.length} 張圖片` });
+      } else if (result.error) {
+        setToast({ visible: true, message: t('scrapeFailed') || `抓取失敗: ${result.error}` });
+      } else {
+        setToast({ visible: true, message: t('noImagesFound') || '此網頁沒有找到圖片' });
       }
     }
-  }, [viewMode, selectedAlbumId, addAlbumImage, addAlbumImages, selectedAlbum?.images?.length, t, looksLikeImageUrl]);
+  }, [viewMode, selectedAlbumId, addAlbumImage, addAlbumImages, selectedAlbum?.images?.length, t, looksLikeImageUrl, confirm]);
 
   const handleCropComplete = async (result) => {
     // Check if this is a virtual image edit (returns edit params instead of image)
@@ -1352,12 +1363,44 @@ function App() {
         const urls = text.split(/[\n,]/).map(u => u.trim()).filter(u => u.startsWith('http'));
         if (urls.length > 0 && viewMode === 'album' && selectedAlbumId) {
           e.preventDefault();
-          // Jump to first newly added image position
+
+          // Check if it's a single webpage URL that should be scraped
+          if (urls.length === 1 && !looksLikeImageUrl(urls[0])) {
+            const electronAPI = getElectronAPI();
+            if (electronAPI?.scrapeImages) {
+              // Ask user for confirmation
+              const webpageUrl = urls[0];
+              const displayUrl = webpageUrl.length > 60 ? webpageUrl.slice(0, 57) + '...' : webpageUrl;
+              const confirmMessage = `${t('scrapeConfirmMessage')}\n\n${displayUrl}`;
+
+              const confirmed = await confirm(confirmMessage, {
+                title: t('scrapeConfirmTitle'),
+                confirmText: t('scrapeImages'),
+                cancelText: t('cancel')
+              });
+
+              if (!confirmed) return;
+
+              setToast({ visible: true, message: t('scraping') || '正在抓取圖片...' });
+              const result = await electronAPI.scrapeImages(webpageUrl);
+              if (result.success && result.images?.length > 0) {
+                const newIndex = selectedAlbum?.images?.length || 0;
+                addAlbumImages(selectedAlbumId, result.images);
+                setAlbumImageIndex(newIndex);
+                setToast({ visible: true, message: t('imagesAdded', { count: result.images.length }) || `已加入 ${result.images.length} 張圖片` });
+              } else if (result.error) {
+                setToast({ visible: true, message: t('scrapeFailed') || `抓取失敗: ${result.error}` });
+              } else {
+                setToast({ visible: true, message: t('noImagesFound') || '此網頁沒有找到圖片' });
+              }
+              return;
+            }
+          }
+
+          // Direct image URLs - add to album
           const newIndex = selectedAlbum?.images?.length || 0;
-          // Add all URLs in single batch (triggers one state update, thumbnails load lazily)
           addAlbumImages(selectedAlbumId, urls);
           setAlbumImageIndex(newIndex);
-          // Show count if multiple URLs
           const msg = urls.length > 1
             ? (t('imagesAdded', { count: urls.length }) || `已加入 ${urls.length} 張圖片`)
             : t('imageAdded');
@@ -1368,7 +1411,7 @@ function App() {
 
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
-  }, [isEditing, viewMode, selectedAlbumId, addAlbumImage, addAlbumImages, selectedAlbum?.images?.length, t]);
+  }, [isEditing, viewMode, selectedAlbumId, addAlbumImage, addAlbumImages, selectedAlbum?.images?.length, t, looksLikeImageUrl, confirm]);
 
   return (
     <div
@@ -1414,6 +1457,38 @@ function App() {
             loadImage(url, PRIORITY_HIGH).catch(() => {});
             addAlbumImage(selectedAlbumId, url);
             setAlbumImageIndex(albumImages.length);
+          }
+        }}
+        onScrapeUrl={async (url) => {
+          if (!selectedAlbumId) return;
+          const electronAPI = getElectronAPI();
+          if (!electronAPI?.scrapeImages) {
+            setToast({ visible: true, message: t('webpageNotSupported') || '需要桌面版才能抓取網頁' });
+            return;
+          }
+
+          // Ask user for confirmation
+          const displayUrl = url.length > 60 ? url.slice(0, 57) + '...' : url;
+          const confirmMessage = `${t('scrapeConfirmMessage')}\n\n${displayUrl}`;
+          const confirmed = await confirm(confirmMessage, {
+            title: t('scrapeConfirmTitle'),
+            confirmText: t('scrapeImages'),
+            cancelText: t('cancel')
+          });
+
+          if (!confirmed) return;
+
+          setToast({ visible: true, message: t('scraping') || '正在抓取圖片...' });
+          const result = await electronAPI.scrapeImages(url);
+          if (result.success && result.images?.length > 0) {
+            const newIndex = albumImages.length;
+            addAlbumImages(selectedAlbumId, result.images);
+            setAlbumImageIndex(newIndex);
+            setToast({ visible: true, message: t('imagesAdded', { count: result.images.length }) || `已加入 ${result.images.length} 張圖片` });
+          } else if (result.error) {
+            setToast({ visible: true, message: t('scrapeFailed') || `抓取失敗: ${result.error}` });
+          } else {
+            setToast({ visible: true, message: t('noImagesFound') || '此網頁沒有找到圖片' });
           }
         }}
         albumSidebarCollapsed={albumSidebarCollapsed}

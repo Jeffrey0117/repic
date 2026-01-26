@@ -150,5 +150,8 @@
   "noImagesFound": "No images found on this page",
   "scrapeFailed": "Scrape failed: {error}",
   "webpageNotSupported": "Webpage drop not supported (drop images instead)",
-  "rename": "Rename"
+  "rename": "Rename",
+  "scrapeConfirmTitle": "Scrape Images",
+  "scrapeConfirmMessage": "Will scrape all images from this page",
+  "scrapeImages": "Scrape"
 }

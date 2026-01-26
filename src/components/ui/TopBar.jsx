@@ -139,6 +139,14 @@ const Trash2 = ({ size = 24, className = '' }) => (
     </svg>
 );
 
+// Check if URL looks like a direct image URL
+const looksLikeImageUrl = (url) => {
+    if (!url) return false;
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'];
+    const urlPath = url.split('?')[0].toLowerCase();
+    return imageExtensions.some(ext => urlPath.endsWith(ext));
+};
+
 export const TopBar = ({
     currentPath,
     onOpenFolder,
@@ -148,6 +156,7 @@ export const TopBar = ({
     onToggleViewMode,
     selectedAlbum,
     onAddAlbumImage,
+    onScrapeUrl,
     albumSidebarCollapsed,
     onToggleAlbumSidebar,
     sidebarPosition,
@@ -219,9 +228,16 @@ export const TopBar = ({
     const handleAddUrl = (e) => {
         e.preventDefault();
         if (urlInput.trim() && onAddAlbumImage) {
-            // Support multiple URLs (newline or comma separated)
-            const urls = urlInput.split(/[\n,]/).map(u => u.trim()).filter(Boolean);
-            urls.forEach(url => onAddAlbumImage(url));
+            const urls = urlInput.split(/[\n,]/).map(u => u.trim()).filter(u => u.startsWith('http'));
+            if (urls.length === 0) return;
+
+            // Single webpage URL - trigger scrape
+            if (urls.length === 1 && !looksLikeImageUrl(urls[0]) && onScrapeUrl) {
+                onScrapeUrl(urls[0]);
+            } else {
+                // Direct image URLs - add directly
+                urls.forEach(url => onAddAlbumImage(url));
+            }
             setUrlInput('');
         }
     };
@@ -229,10 +245,16 @@ export const TopBar = ({
     const handlePaste = (e) => {
         const pastedText = e.clipboardData.getData('text');
         if (pastedText) {
-            const urls = pastedText.split(/[\n,]/).map(u => u.trim()).filter(Boolean);
-            if (urls.length > 0 && urls.every(url => url.startsWith('http'))) {
+            const urls = pastedText.split(/[\n,]/).map(u => u.trim()).filter(u => u.startsWith('http'));
+            if (urls.length > 0) {
                 e.preventDefault();
-                urls.forEach(url => onAddAlbumImage(url));
+                // Single webpage URL - trigger scrape
+                if (urls.length === 1 && !looksLikeImageUrl(urls[0]) && onScrapeUrl) {
+                    onScrapeUrl(urls[0]);
+                } else {
+                    // Direct image URLs - add directly
+                    urls.forEach(url => onAddAlbumImage(url));
+                }
             }
         }
     };

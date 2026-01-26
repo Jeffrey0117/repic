@@ -291,49 +291,80 @@ export const Sidebar = ({
         loadRepicData();
     }, [files, mode, cacheVersion]);
 
-    // Load/generate thumbnails for local files (with caching)
+    // Load/generate thumbnails for local files (with streaming + priority)
     useEffect(() => {
         if (mode !== 'local' || !electronAPI) return;
 
         const loadThumbnails = async () => {
-            // Only process visible files (first 50)
-            const visibleFiles = files.slice(0, 50).filter(f => !isRepicFile(f));
+            // Filter out .repic files and already cached files
+            const needThumbs = files
+                .filter(f => !isRepicFile(f))
+                .filter(f => !thumbMemCache.has(f) && !cachedThumbs[f]);
 
-            for (const file of visibleFiles) {
-                // Skip if already cached in memory
-                if (thumbMemCache.has(file) || cachedThumbs[file]) continue;
+            if (needThumbs.length === 0) return;
 
+            // Sort by priority: closest to currentIndex first
+            const sortedFiles = [...needThumbs].sort((a, b) => {
+                const idxA = files.indexOf(a);
+                const idxB = files.indexOf(b);
+                return Math.abs(idxA - currentIndex) - Math.abs(idxB - currentIndex);
+            });
+
+            // First: check IndexedDB cache for all files
+            const uncached = [];
+            for (const file of sortedFiles) {
                 try {
-                    // Try memory cache first
-                    if (thumbMemCache.has(file)) {
-                        setCachedThumbs(prev => ({ ...prev, [file]: thumbMemCache.get(file) }));
-                        continue;
-                    }
-
-                    // Try IndexedDB cache
                     const cached = await getThumbnail(file, cacheVersion);
                     if (cached) {
                         thumbMemCache.set(file, cached);
                         setCachedThumbs(prev => ({ ...prev, [file]: cached }));
-                        continue;
-                    }
-
-                    // Generate new thumbnail
-                    const thumb = await generateThumbnail(`file://${file}`);
-                    if (thumb) {
-                        thumbMemCache.set(file, thumb);
-                        setCachedThumbs(prev => ({ ...prev, [file]: thumb }));
-                        // Save to IndexedDB (async, don't wait)
-                        saveThumbnail(file, cacheVersion, thumb);
+                    } else {
+                        uncached.push(file);
                     }
                 } catch (e) {
-                    // Silently fail, will use original image
+                    uncached.push(file);
+                }
+            }
+
+            if (uncached.length === 0) return;
+
+            // Use Go streaming API for uncached files
+            if (electronAPI.batchThumbnailsStream) {
+                console.log(`[Sidebar] Streaming ${uncached.length} thumbnails (priority order)`);
+                electronAPI.batchThumbnailsStream(uncached, {
+                    size: 200,
+                    concurrency: 8,
+                    onProgress: (item) => {
+                        if (item.type === 'summary') {
+                            console.log(`[Sidebar] Thumbnails complete: ${item.completed}/${item.total} in ${item.duration_ms}ms`);
+                            return;
+                        }
+                        if (item.success && item.base64) {
+                            const base64Url = item.base64.startsWith('data:') ? item.base64 : `data:image/jpeg;base64,${item.base64}`;
+                            thumbMemCache.set(item.source, base64Url);
+                            setCachedThumbs(prev => ({ ...prev, [item.source]: base64Url }));
+                            // Save to IndexedDB (async)
+                            saveThumbnail(item.source, cacheVersion, base64Url);
+                        }
+                    }
+                });
+            } else {
+                // Fallback: generate one by one with Canvas (slower)
+                for (const file of uncached.slice(0, 20)) {
+                    try {
+                        const thumb = await generateThumbnail(`file://${file}`);
+                        if (thumb) {
+                            thumbMemCache.set(file, thumb);
+                            setCachedThumbs(prev => ({ ...prev, [file]: thumb }));
+                            saveThumbnail(file, cacheVersion, thumb);
+                        }
+                    } catch (e) {}
                 }
             }
         };
 
         loadThumbnails();
-    }, [files, mode, cacheVersion]);
+    }, [files, mode, cacheVersion, currentIndex]);
 
     // Preload ALL thumbnails from cache when album changes (instant display)
     useEffect(() => {
