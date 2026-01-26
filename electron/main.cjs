@@ -831,6 +831,116 @@ function setupIpcHandlers() {
         });
     };
 
+    // Batch download with Go (faster than Node.js Promise.all)
+    const batchDownloadWithGo = (urls, outputDir, concurrency = 8) => {
+        return new Promise((resolve) => {
+            const scraperPath = path.join(__dirname, '..', 'scraper', 'scraper.exe');
+
+            if (!fs.existsSync(scraperPath)) {
+                console.log('[batch-download] Go downloader not found');
+                resolve(null);
+                return;
+            }
+
+            console.log('[batch-download] Using Go downloader for', urls.length, 'images');
+            const startTime = Date.now();
+
+            const proc = spawn(scraperPath, [
+                '--download',
+                '--urls', urls.join(','),
+                '--output', outputDir,
+                '--concurrency', String(concurrency)
+            ]);
+
+            let stdout = '';
+            let stderr = '';
+
+            proc.stdout.on('data', (data) => {
+                stdout += data.toString();
+            });
+
+            proc.stderr.on('data', (data) => {
+                stderr += data.toString();
+            });
+
+            proc.on('close', (code) => {
+                const duration = Date.now() - startTime;
+                if (code === 0 && stdout) {
+                    try {
+                        const result = JSON.parse(stdout);
+                        console.log(`[batch-download] Go completed: ${result.completed}/${result.total} in ${duration}ms`);
+                        resolve(result);
+                    } catch (e) {
+                        console.error('[batch-download] Parse error:', e);
+                        resolve(null);
+                    }
+                } else {
+                    console.log('[batch-download] Go failed:', stderr || `exit code ${code}`);
+                    resolve(null);
+                }
+            });
+
+            proc.on('error', (err) => {
+                console.error('[batch-download] Spawn error:', err);
+                resolve(null);
+            });
+
+            // Timeout after 60 seconds for batch downloads
+            setTimeout(() => {
+                proc.kill();
+                console.log('[batch-download] Timeout');
+                resolve(null);
+            }, 60000);
+        });
+    };
+
+    // Batch download IPC handler
+    ipcMain.handle('batch-download-images', async (event, { urls, outputDir, concurrency }) => {
+        console.log('[batch-download-images] Request:', urls.length, 'images to', outputDir);
+
+        // Ensure output directory exists
+        if (!fs.existsSync(outputDir)) {
+            fs.mkdirSync(outputDir, { recursive: true });
+        }
+
+        // Try Go first
+        const goResult = await batchDownloadWithGo(urls, outputDir, concurrency || 8);
+        if (goResult && goResult.success) {
+            return goResult;
+        }
+
+        // Fallback to Node.js Promise.all
+        console.log('[batch-download-images] Falling back to Node.js');
+        const startTime = Date.now();
+        const results = await Promise.all(urls.map(async (url, index) => {
+            try {
+                const filePath = await downloadToTemp(url);
+                const filename = path.basename(filePath);
+                const targetPath = path.join(outputDir, filename);
+                fs.copyFileSync(filePath, targetPath);
+                const stats = fs.statSync(targetPath);
+                return { url, filename, success: true, size: stats.size };
+            } catch (e) {
+                return { url, filename: `image_${index}.jpg`, success: false, error: e.message };
+            }
+        }));
+
+        const completed = results.filter(r => r.success).length;
+        const failed = results.filter(r => !r.success).length;
+        const duration = Date.now() - startTime;
+
+        console.log(`[batch-download-images] Node.js completed: ${completed}/${urls.length} in ${duration}ms`);
+
+        return {
+            success: failed === 0,
+            total: urls.length,
+            completed,
+            failed,
+            items: results,
+            duration_ms: duration
+        };
+    });
+
     // Scrape images from webpage URL - IPC handler
     ipcMain.handle('scrape-images', async (event, url) => {
         // Try Go scraper first

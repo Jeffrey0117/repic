@@ -28,5 +28,8 @@ release/
 native/
 nul
 
-# Go scraper binary
+# Go scraper binary and test files
 scraper/*.exe
+scraper/test_*/
+scraper/build.bat
+scraper/*_benchmark.*
