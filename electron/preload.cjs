@@ -238,5 +238,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
             return { success: false, error: 'Invalid URL' };
         }
         return await ipcRenderer.invoke('scrape-images', url);
+    },
+
+    // Batch download images (uses Go for speed)
+    batchDownloadImages: async (urls, outputDir, concurrency = 8) => {
+        if (!Array.isArray(urls) || urls.length === 0) {
+            return { success: false, error: 'No URLs provided' };
+        }
+        if (!outputDir || typeof outputDir !== 'string') {
+            return { success: false, error: 'Invalid output directory' };
+        }
+        return await ipcRenderer.invoke('batch-download-images', { urls, outputDir, concurrency });
     }
 });

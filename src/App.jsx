@@ -684,7 +684,7 @@ function App() {
     setIsMultiSelectMode(false);
   }, []);
 
-  // Batch download selected images
+  // Batch download selected images (uses Go for speed)
   const handleBatchDownload = useCallback(async () => {
     if (selectedImageIds.size === 0 || !selectedAlbum) return;
 
@@ -696,51 +696,67 @@ function App() {
     if (!folder) return;
 
     const selectedImages = selectedAlbum.images.filter(img => selectedImageIds.has(img.id));
-    let successCount = 0;
-    let failCount = 0;
+    const urls = selectedImages.map(img => img.url).filter(url => url?.startsWith('http'));
+
+    if (urls.length === 0) {
+      setToast({ visible: true, message: t('noImagesFound') });
+      return;
+    }
 
     setToast({ visible: true, message: t('processing') });
 
-    for (let i = 0; i < selectedImages.length; i++) {
-      const img = selectedImages[i];
-      try {
-        // Fetch image
-        const response = await fetch(img.url);
-        if (!response.ok) throw new Error('Fetch failed');
-        const blob = await response.blob();
+    // Use Go batch downloader for speed
+    if (electronAPI.batchDownloadImages) {
+      const result = await electronAPI.batchDownloadImages(urls, folder, 8);
+      console.log('[BatchDownload] Result:', result);
 
-        // Convert to base64
-        const reader = new FileReader();
-        const base64 = await new Promise((resolve, reject) => {
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-
-        // Generate filename
-        const urlFilename = img.url.split('/').pop()?.split('?')[0] || `image-${i + 1}`;
-        const ext = blob.type.split('/')[1] || 'png';
-        const filename = urlFilename.includes('.') ? urlFilename : `${urlFilename}.${ext}`;
-        const filePath = electronAPI.path.join(folder, filename);
-
-        // Save file
-        const result = await electronAPI.saveFile(filePath, base64);
-        if (result.success) {
-          successCount++;
+      if (result.success || result.completed > 0) {
+        if (result.failed > 0) {
+          setToast({ visible: true, message: t('completedMessage', { success: result.completed, failed: result.failed }) });
         } else {
+          setToast({ visible: true, message: t('downloadSuccess') + ` (${result.completed})` });
+        }
+      } else {
+        setToast({ visible: true, message: t('downloadFailed') });
+      }
+    } else {
+      // Fallback: one by one (old method)
+      let successCount = 0;
+      let failCount = 0;
+
+      for (let i = 0; i < selectedImages.length; i++) {
+        const img = selectedImages[i];
+        try {
+          const response = await fetch(img.url);
+          if (!response.ok) throw new Error('Fetch failed');
+          const blob = await response.blob();
+
+          const reader = new FileReader();
+          const base64 = await new Promise((resolve, reject) => {
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+
+          const urlFilename = img.url.split('/').pop()?.split('?')[0] || `image-${i + 1}`;
+          const ext = blob.type.split('/')[1] || 'png';
+          const filename = urlFilename.includes('.') ? urlFilename : `${urlFilename}.${ext}`;
+          const filePath = electronAPI.path.join(folder, filename);
+
+          const result = await electronAPI.saveFile(filePath, base64);
+          if (result.success) successCount++;
+          else failCount++;
+        } catch (err) {
+          console.error('[BatchDownload] Failed:', img.url, err);
           failCount++;
         }
-      } catch (err) {
-        console.error('[BatchDownload] Failed:', img.url, err);
-        failCount++;
       }
-    }
 
-    // Show result
-    if (failCount > 0) {
-      setToast({ visible: true, message: t('completedMessage', { success: successCount, failed: failCount }) });
-    } else {
-      setToast({ visible: true, message: t('downloadSuccess') + ` (${successCount})` });
+      if (failCount > 0) {
+        setToast({ visible: true, message: t('completedMessage', { success: successCount, failed: failCount }) });
+      } else {
+        setToast({ visible: true, message: t('downloadSuccess') + ` (${successCount})` });
+      }
     }
 
     // Exit multi-select
