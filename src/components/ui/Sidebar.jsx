@@ -393,10 +393,9 @@ export const Sidebar = ({
                                     {onSelectAll && (
                                         <button
                                             onClick={() => onSelectAll(selectedIds.size === files.length)}
-                                            className="text-[10px] text-primary hover:text-primary/80 px-1.5 py-0.5 rounded hover:bg-primary/10"
-                                            title={selectedIds.size === files.length ? '取消全選' : '全選'}
+                                            className="text-[10px] text-primary hover:text-primary/80 px-2 py-0.5 rounded hover:bg-primary/10"
                                         >
-                                            {selectedIds.size === files.length ? '☐' : '☑'}
+                                            {selectedIds.size === files.length ? '取消' : '全選'}
                                         </button>
                                     )}
                                     <button
