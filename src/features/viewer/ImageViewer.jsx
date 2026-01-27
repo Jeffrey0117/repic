@@ -115,7 +115,7 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
                     setIsLoading(false);
                     return;
                 }
-                // Try proxy as fallback
+                // Layer 2: Try Node.js proxy
                 if (electronAPI?.proxyImage) {
                     try {
                         const result = await electronAPI.proxyImage(src);
@@ -125,11 +125,28 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
                             return;
                         }
                     } catch (e) {
-                        // Proxy also failed
+                        // Continue to browser proxy
                     }
                 }
-                setIsLoading(false);
-                setLoadFailed(true);
+
+                // Layer 3: Try browser proxy (for strict sites like postimg)
+                if (!cancelled && electronAPI?.proxyImageBrowser) {
+                    try {
+                        const result = await electronAPI.proxyImageBrowser(src);
+                        if (!cancelled && result.success) {
+                            setProxiedSrc(result.data);
+                            setIsLoading(false);
+                            return;
+                        }
+                    } catch (e) {
+                        // All methods failed
+                    }
+                }
+
+                if (!cancelled) {
+                    setIsLoading(false);
+                    setLoadFailed(true);
+                }
             });
 
         return () => {

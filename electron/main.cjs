@@ -285,6 +285,35 @@ function downloadToTemp(url) {
     });
 }
 
+// Browser proxy queue - only one hidden window at a time to avoid rate limiting
+const browserProxyQueue = [];
+let browserProxyActive = false;
+const browserProxyCache = new Map(); // URL -> base64 result (avoid re-fetching)
+
+function enqueueBrowserProxy(url, resolve) {
+    // Check cache first
+    if (browserProxyCache.has(url)) {
+        resolve(browserProxyCache.get(url));
+        return;
+    }
+    browserProxyQueue.push({ url, resolve });
+    processBrowserProxyQueue();
+}
+
+function processBrowserProxyQueue() {
+    if (browserProxyActive || browserProxyQueue.length === 0) return;
+    browserProxyActive = true;
+    const { url, resolve } = browserProxyQueue.shift();
+    executeBrowserProxy(url).then((result) => {
+        if (result.success) {
+            browserProxyCache.set(url, result);
+        }
+        resolve(result);
+        browserProxyActive = false;
+        processBrowserProxyQueue(); // Process next
+    });
+}
+
 // Convert strict-site image URLs to their page URLs
 // e.g. https://i.postimg.cc/pVk9mCkX/44-840.jpg -> https://postimg.cc/pVk9mCkX
 function imageUrlToPageUrl(url) {
@@ -743,6 +772,16 @@ function setupIpcHandlers() {
             console.log('[proxy-image-browser] No page URL mapping for:', url);
             return { success: false, error: 'No page URL mapping' };
         }
+
+        // Queue the request (one at a time to avoid rate limiting)
+        return new Promise((resolve) => {
+            enqueueBrowserProxy(url, resolve);
+        });
+    });
+
+    // Actual browser proxy execution (called by queue)
+    function executeBrowserProxy(url) {
+        const pageUrl = imageUrlToPageUrl(url);
         console.log('[proxy-image-browser] Loading page:', pageUrl);
 
         return new Promise((resolve) => {
@@ -843,7 +882,7 @@ function setupIpcHandlers() {
                 setTimeout(() => checkImages(0), 1000);
             });
         });
-    });
+    }
 
     // Set always on top
     ipcMain.handle('set-always-on-top', (event, value) => {
