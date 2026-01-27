@@ -33,3 +33,7 @@ scraper/*.exe
 scraper/test_*/
 scraper/build.bat
 scraper/*_benchmark.*
+
+# Temporary files
+temp_*.jpg
+temp_*.png
