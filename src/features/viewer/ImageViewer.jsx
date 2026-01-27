@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import useI18n from '../../hooks/useI18n';
-import { getCached } from '../../utils/imageLoader';
+import { getCached, loadImage, PRIORITY_HIGH } from '../../utils/imageLoader';
+import { getLocalUrl, onPrefetchComplete } from '../../utils/prefetchManager';
 import { drawAnnotation } from '../editor/utils/drawingHelpers';
 
 const electronAPI = window.electronAPI || null;
@@ -70,7 +71,16 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
             return;
         }
 
-        // Web images: check cache first
+        // Check if Go prefetched this image to local temp
+        const localUrl = getLocalUrl(src);
+        if (localUrl) {
+            console.log('[ImageViewer] Using prefetched:', localUrl);
+            setProxiedSrc(localUrl);
+            setIsLoading(false);
+            return;
+        }
+
+        // Web images: check JS cache
         const cached = getCached(src);
         if (cached) {
             setProxiedSrc(cached);
@@ -78,25 +88,53 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
             return;
         }
 
-        // Will load via img tag directly
+        // Not prefetched yet - show loading and wait for prefetch or load via JS
         setIsLoading(true);
         let cancelled = false;
 
-        // Timeout: if image doesn't load in 5s, try proxy (for ERR_HTTP2_PROTOCOL_ERROR etc.)
-        const timeoutId = setTimeout(async () => {
+        // Listen for prefetch completion
+        const unsubscribe = onPrefetchComplete(src, (localPath) => {
             if (cancelled) return;
-            if (electronAPI?.proxyImage) {
-                console.log('[ImageViewer] Timeout, trying proxy:', src);
-                const result = await electronAPI.proxyImage(src);
-                if (!cancelled && result.success) {
-                    setProxiedSrc(result.data);
+            const fileUrl = `file:///${localPath.replace(/\\/g, '/')}`;
+            console.log('[ImageViewer] Prefetch complete:', fileUrl);
+            setProxiedSrc(fileUrl);
+            setIsLoading(false);
+        });
+
+        // Also load via JS imageLoader as fallback
+        loadImage(src, PRIORITY_HIGH)
+            .then((data) => {
+                if (cancelled) return;
+                setProxiedSrc(data);
+                setIsLoading(false);
+            })
+            .catch(async (err) => {
+                if (cancelled) return;
+                // Don't retry if aborted
+                if (err?.name === 'AbortError') {
+                    setIsLoading(false);
+                    return;
                 }
-            }
-        }, 5000);
+                // Try proxy as fallback
+                if (electronAPI?.proxyImage) {
+                    try {
+                        const result = await electronAPI.proxyImage(src);
+                        if (!cancelled && result.success) {
+                            setProxiedSrc(result.data);
+                            setIsLoading(false);
+                            return;
+                        }
+                    } catch (e) {
+                        // Proxy also failed
+                    }
+                }
+                setIsLoading(false);
+                setLoadFailed(true);
+            });
 
         return () => {
             cancelled = true;
-            clearTimeout(timeoutId);
+            unsubscribe();
         };
     }, [src]);
 

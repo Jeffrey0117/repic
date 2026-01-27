@@ -20,6 +20,7 @@ import { useWebAlbums } from './hooks/useWebAlbums';
 import { useConfirmDialog } from './hooks/useConfirmDialog';
 import useI18n from './hooks/useI18n';
 import { loadImage, PRIORITY_HIGH } from './utils/imageLoader';
+import { prefetchWindow, clearPrefetch } from './utils/prefetchManager';
 
 // Lazy load heavy components
 const ImageEditor = lazy(() => import('./features/editor/ImageEditor').then(m => ({ default: m.ImageEditor })));
@@ -1034,7 +1035,23 @@ function App() {
   // Reset album image index when album changes
   useEffect(() => {
     setAlbumImageIndex(0);
+    clearPrefetch(); // Clear old prefetch when switching albums
   }, [selectedAlbumId]);
+
+  // Prefetch images around current index (sliding window via Go)
+  useEffect(() => {
+    if (viewMode !== 'album' || !selectedAlbum?.images?.length) return;
+    const urls = selectedAlbum.images.map(img => img.url).filter(Boolean);
+    if (urls.length > 0) {
+      prefetchWindow(urls, albumImageIndex);
+    }
+  }, [viewMode, selectedAlbum?.images, albumImageIndex]);
+
+  // Fallback: also preload via JS imageLoader for immediate display
+  useEffect(() => {
+    if (viewMode !== 'album' || !currentAlbumImage) return;
+    loadImage(currentAlbumImage, PRIORITY_HIGH).catch(() => {});
+  }, [viewMode, currentAlbumImage]);
 
   // Preload adjacent album images for smoother navigation
   useEffect(() => {

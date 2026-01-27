@@ -285,6 +285,27 @@ function downloadToTemp(url) {
     });
 }
 
+// Convert strict-site image URLs to their page URLs
+// e.g. https://i.postimg.cc/pVk9mCkX/44-840.jpg -> https://postimg.cc/pVk9mCkX
+function imageUrlToPageUrl(url) {
+    try {
+        const urlObj = new URL(url);
+
+        // postimg: i.postimg.cc/{id}/filename.jpg -> postimg.cc/{id}
+        if (urlObj.hostname === 'i.postimg.cc') {
+            const parts = urlObj.pathname.split('/').filter(Boolean);
+            if (parts.length >= 1) {
+                return `https://postimg.cc/${parts[0]}`;
+            }
+        }
+
+        // Add more strict sites here as needed
+        return null;
+    } catch (e) {
+        return null;
+    }
+}
+
 // V8 Startup Optimization
 app.commandLine.appendSwitch('js-flags', '--max-old-space-size=256');
 // Enable V8 code cache for faster startup
@@ -709,6 +730,119 @@ function setupIpcHandlers() {
             console.error('[proxy-image] Error:', e.message);
             return { success: false, error: e.message };
         }
+    });
+
+    // Proxy image using hidden browser window - loads the HOST PAGE and extracts image from DOM
+    // For strict sites like postimg that only serve images within their own page context
+    ipcMain.handle('proxy-image-browser', async (event, url) => {
+        console.log('[proxy-image-browser] Requested:', url);
+
+        // Convert image URL to page URL for known strict hosts
+        const pageUrl = imageUrlToPageUrl(url);
+        if (!pageUrl) {
+            console.log('[proxy-image-browser] No page URL mapping for:', url);
+            return { success: false, error: 'No page URL mapping' };
+        }
+        console.log('[proxy-image-browser] Loading page:', pageUrl);
+
+        return new Promise((resolve) => {
+            const hiddenWin = new BrowserWindow({
+                width: 800,
+                height: 600,
+                show: false,
+                webPreferences: {
+                    nodeIntegration: false,
+                    contextIsolation: true,
+                    webSecurity: false // Allow canvas extraction of cross-origin images
+                }
+            });
+
+            let resolved = false;
+            const cleanup = () => {
+                if (!hiddenWin.isDestroyed()) {
+                    hiddenWin.close();
+                }
+            };
+
+            const timeout = setTimeout(() => {
+                if (!resolved) {
+                    resolved = true;
+                    console.log('[proxy-image-browser] Timeout');
+                    cleanup();
+                    resolve({ success: false, error: 'Timeout' });
+                }
+            }, 15000);
+
+            hiddenWin.webContents.on('console-message', (e, level, message) => {
+                console.log('[proxy-image-browser] Page console:', message);
+            });
+
+            hiddenWin.loadURL(pageUrl);
+
+            hiddenWin.webContents.on('did-finish-load', () => {
+                // Wait for page JS to run and images to load
+                const checkImages = async (attempt = 0) => {
+                    if (resolved || attempt > 30) {
+                        if (!resolved) {
+                            resolved = true;
+                            clearTimeout(timeout);
+                            cleanup();
+                            resolve({ success: false, error: 'Image not found in page' });
+                        }
+                        return;
+                    }
+                    try {
+                        const result = await hiddenWin.webContents.executeJavaScript(`
+                            (function() {
+                                // Find the largest image on the page (the main content image)
+                                const imgs = Array.from(document.querySelectorAll('img'));
+                                let best = null;
+                                let bestArea = 0;
+                                for (const img of imgs) {
+                                    if (!img.complete || !img.naturalWidth) continue;
+                                    const area = img.naturalWidth * img.naturalHeight;
+                                    if (area > bestArea) {
+                                        bestArea = area;
+                                        best = img;
+                                    }
+                                }
+                                if (best && bestArea > 10000) {
+                                    try {
+                                        const canvas = document.createElement('canvas');
+                                        canvas.width = best.naturalWidth;
+                                        canvas.height = best.naturalHeight;
+                                        const ctx = canvas.getContext('2d');
+                                        ctx.drawImage(best, 0, 0);
+                                        return { success: true, data: canvas.toDataURL('image/jpeg', 0.95), w: best.naturalWidth, h: best.naturalHeight };
+                                    } catch (e) {
+                                        return { success: false, error: 'Canvas tainted: ' + e.message };
+                                    }
+                                }
+                                return null; // Still loading
+                            })();
+                        `);
+                        if (result) {
+                            resolved = true;
+                            clearTimeout(timeout);
+                            cleanup();
+                            console.log('[proxy-image-browser]', result.success ? 'Success ' + result.w + 'x' + result.h : 'Failed: ' + result.error);
+                            resolve(result);
+                        } else {
+                            setTimeout(() => checkImages(attempt + 1), 500);
+                        }
+                    } catch (e) {
+                        if (!resolved) {
+                            resolved = true;
+                            clearTimeout(timeout);
+                            cleanup();
+                            resolve({ success: false, error: e.message });
+                        }
+                    }
+                };
+                // Give page JS time to initialize
+                setTimeout(() => checkImages(0), 1000);
+            });
+        });
     });
 
     // Set always on top
@@ -1162,6 +1296,69 @@ function setupIpcHandlers() {
 
         // Don't wait for completion - return immediately
         return { success: true, started: true };
+    });
+
+    // Prefetch images to temp - streaming download with local paths
+    ipcMain.handle('prefetch-images', async (event, { urls, requestId }) => {
+        const scraperPath = path.join(__dirname, '..', 'scraper', 'repic-scraper.exe');
+
+        if (!fs.existsSync(scraperPath)) {
+            console.log('[prefetch-images] Go processor not found');
+            return { success: false, error: 'Go processor not found' };
+        }
+
+        // Use a dedicated prefetch temp directory
+        const prefetchDir = path.join(os.tmpdir(), 'repic-prefetch');
+
+        console.log('[prefetch-images] Starting prefetch for', urls.length, 'images to', prefetchDir);
+
+        const args = [
+            '--prefetch',
+            '--urls', urls.join(','),
+            '--output', prefetchDir,
+            '--concurrency', '16'  // High concurrency for speed
+        ];
+
+        const proc = spawn(scraperPath, args);
+        let buffer = '';
+
+        proc.stdout.on('data', (data) => {
+            buffer += data.toString();
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+
+            for (const line of lines) {
+                if (!line.trim()) continue;
+                try {
+                    const item = JSON.parse(line);
+                    // Send each result to renderer immediately
+                    event.sender.send('prefetch-ready', { requestId, item });
+                } catch (e) {
+                    console.error('[prefetch-images] Parse error:', e.message);
+                }
+            }
+        });
+
+        proc.stderr.on('data', (data) => {
+            console.error('[prefetch-images] stderr:', data.toString());
+        });
+
+        proc.on('close', (code) => {
+            if (buffer.trim()) {
+                try {
+                    const item = JSON.parse(buffer);
+                    event.sender.send('prefetch-ready', { requestId, item });
+                } catch (e) {}
+            }
+            console.log('[prefetch-images] Complete, exit code:', code);
+        });
+
+        proc.on('error', (err) => {
+            console.error('[prefetch-images] Spawn error:', err);
+            event.sender.send('prefetch-ready', { requestId, item: { type: 'error', error: err.message } });
+        });
+
+        return { success: true, started: true, tempDir: prefetchDir };
     });
 
     // Scrape images from webpage URL - IPC handler

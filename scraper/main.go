@@ -129,6 +129,9 @@ func main() {
 	compressFlag := flag.Bool("compress", false, "Enable compress mode")
 	qualityFlag := flag.Int("quality", 85, "JPEG quality (1-100)")
 
+	// Prefetch mode - download URLs to temp, return local paths (streaming)
+	prefetchFlag := flag.Bool("prefetch", false, "Enable prefetch mode")
+
 	flag.Parse()
 
 	if *cropFlag {
@@ -147,6 +150,14 @@ func main() {
 		}
 		result := compressImage(*inputFlag, *outputFlag, *qualityFlag)
 		outputJSON(result)
+	} else if *prefetchFlag {
+		// Prefetch mode - streaming download to temp
+		if *urlsFlag == "" || *outputFlag == "" {
+			outputJSON(map[string]interface{}{"success": false, "error": "urls and output required"})
+			return
+		}
+		urls := strings.Split(*urlsFlag, ",")
+		prefetchImages(urls, *outputFlag, *concurrencyFlag)
 	} else if *thumbnailFlag {
 		// Thumbnail generation mode
 		if *filesFlag == "" {
@@ -800,6 +811,160 @@ func cropImage(inputPath, outputPath string, x, y, w, h int) map[string]interfac
 }
 
 // ============ COMPRESS MODE ============
+
+// ============ PREFETCH MODE ============
+
+// PrefetchItem represents a single prefetch result
+type PrefetchItem struct {
+	URL       string `json:"url"`
+	LocalPath string `json:"localPath,omitempty"`
+	Success   bool   `json:"success"`
+	Error     string `json:"error,omitempty"`
+	Size      int64  `json:"size,omitempty"`
+	Cached    bool   `json:"cached,omitempty"` // true if file already existed
+}
+
+// prefetchImages downloads images to temp dir, streaming results as NDJSON
+func prefetchImages(urls []string, tempDir string, concurrency int) {
+	encoder := json.NewEncoder(os.Stdout)
+
+	// Create temp dir if needed
+	if err := os.MkdirAll(tempDir, 0755); err != nil {
+		encoder.Encode(PrefetchItem{Error: err.Error()})
+		return
+	}
+
+	sem := make(chan struct{}, concurrency)
+	results := make(chan PrefetchItem, len(urls))
+	var wg sync.WaitGroup
+
+	for _, rawURL := range urls {
+		rawURL = strings.TrimSpace(rawURL)
+		if rawURL == "" || !strings.HasPrefix(rawURL, "http") {
+			continue
+		}
+
+		wg.Add(1)
+		go func(imageURL string) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			item := prefetchSingleImage(imageURL, tempDir)
+			results <- item
+		}(rawURL)
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	// Stream each result immediately
+	completed := 0
+	failed := 0
+	for item := range results {
+		encoder.Encode(item)
+		if item.Success {
+			completed++
+		} else {
+			failed++
+		}
+	}
+
+	// Final summary
+	encoder.Encode(map[string]interface{}{
+		"type":      "summary",
+		"completed": completed,
+		"failed":    failed,
+	})
+}
+
+// prefetchSingleImage downloads one image to temp dir
+func prefetchSingleImage(imageURL, tempDir string) PrefetchItem {
+	item := PrefetchItem{URL: imageURL}
+
+	// Generate filename from URL hash (deterministic)
+	hash := hashURL(imageURL)
+	ext := getExtFromURL(imageURL)
+	filename := hash + ext
+	localPath := filepath.Join(tempDir, filename)
+
+	// Check if already cached
+	if info, err := os.Stat(localPath); err == nil {
+		item.Success = true
+		item.LocalPath = localPath
+		item.Size = info.Size()
+		item.Cached = true
+		return item
+	}
+
+	// Download
+	req, err := http.NewRequest("GET", imageURL, nil)
+	if err != nil {
+		item.Error = err.Error()
+		return item
+	}
+
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+	req.Header.Set("Accept", "image/webp,image/apng,image/*,*/*;q=0.8")
+
+	resp, err := sharedClient.Do(req)
+	if err != nil {
+		item.Error = err.Error()
+		return item
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		item.Error = fmt.Sprintf("HTTP %d", resp.StatusCode)
+		return item
+	}
+
+	// Write to temp file
+	out, err := os.Create(localPath)
+	if err != nil {
+		item.Error = err.Error()
+		return item
+	}
+	defer out.Close()
+
+	written, err := io.Copy(out, resp.Body)
+	if err != nil {
+		os.Remove(localPath)
+		item.Error = err.Error()
+		return item
+	}
+
+	item.Success = true
+	item.LocalPath = localPath
+	item.Size = written
+	return item
+}
+
+// hashURL creates a short hash from URL for filename
+func hashURL(u string) string {
+	// Simple hash: use last 16 chars of base64 encoded URL
+	encoded := base64.URLEncoding.EncodeToString([]byte(u))
+	if len(encoded) > 16 {
+		return encoded[len(encoded)-16:]
+	}
+	return encoded
+}
+
+// getExtFromURL extracts extension from URL
+func getExtFromURL(u string) string {
+	parsed, err := url.Parse(u)
+	if err != nil {
+		return ".jpg"
+	}
+	ext := strings.ToLower(filepath.Ext(parsed.Path))
+	validExts := map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".gif": true, ".webp": true}
+	if validExts[ext] {
+		return ext
+	}
+	return ".jpg"
+}
 
 func compressImage(inputPath, outputPath string, quality int) map[string]interface{} {
 	result := make(map[string]interface{})

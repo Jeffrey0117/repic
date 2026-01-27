@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { cancelAll } from '../utils/imageLoader';
 
 const STORAGE_KEY = 'repic-web-albums';
 const SOFT_DELETE_DAYS = 7; // Days before permanent deletion
@@ -251,6 +252,8 @@ export const useWebAlbums = () => {
 
   // Select album (immediate switch)
   const selectAlbum = useCallback((albumId) => {
+    // Cancel pending image loads BEFORE switching (prevents old album blocking new)
+    cancelAll();
     setSelectedAlbumId(albumId);
   }, []);
 

@@ -76,8 +76,10 @@ class LRUCache {
 const memoryCache = new LRUCache(MAX_MEMORY_CACHE); // URL -> base64/blob URL
 const thumbCache = new LRUCache(MAX_THUMB_CACHE); // URL -> thumbnail base64
 const loadingPromises = new Map(); // URL -> Promise (dedup concurrent requests)
+const abortControllers = new Map(); // URL -> AbortController (for cancellation)
 const queue = []; // Priority queue: { url, priority, resolve, reject }
 let activeCount = 0;
+let cancelGeneration = 0; // Incremented on cancelAll(), used to detect stale requests
 
 /**
  * Generate thumbnail from base64 image data
@@ -145,14 +147,20 @@ const processQueue = () => {
   const item = queue.shift();
   if (!item) return;
 
+  // Capture generation to detect if cancelled
+  const myGeneration = cancelGeneration;
+
   activeCount++;
 
   fetchImage(item.url)
     .then(item.resolve)
     .catch(item.reject)
     .finally(() => {
-      activeCount--;
-      processQueue(); // Process next
+      // Only decrement if not cancelled (cancelAll resets activeCount)
+      if (cancelGeneration === myGeneration) {
+        activeCount--;
+        processQueue(); // Process next
+      }
     });
 };
 
@@ -160,6 +168,9 @@ const processQueue = () => {
  * Fetch a single image with caching + thumbnail generation
  */
 const fetchImage = async (url) => {
+  // Capture current generation to detect if cancelled during async operations
+  const myGeneration = cancelGeneration;
+
   // Check memory cache first (instant)
   if (memoryCache.has(url)) {
     return memoryCache.get(url);
@@ -168,6 +179,10 @@ const fetchImage = async (url) => {
   // Check IndexedDB cache (fast)
   try {
     const cached = await getCachedImage(url);
+    // Check if cancelled while waiting for cache
+    if (cancelGeneration !== myGeneration) {
+      throw new DOMException('Cancelled', 'AbortError');
+    }
     if (cached) {
       memoryCache.set(url, cached);
       // Also try to load cached thumbnail
@@ -186,15 +201,31 @@ const fetchImage = async (url) => {
       return cached;
     }
   } catch (e) {
-    // Ignore cache errors
+    // Re-throw AbortError, ignore other cache errors
+    if (e?.name === 'AbortError') throw e;
   }
 
+  // Check again if cancelled before starting network request
+  if (cancelGeneration !== myGeneration) {
+    throw new DOMException('Cancelled', 'AbortError');
+  }
+
+  // Create AbortController for this request
+  const controller = new AbortController();
+  abortControllers.set(url, controller);
+
   // Fetch from network
-  const response = await fetch(url, {
-    mode: 'cors',
-    credentials: 'omit',
-    referrerPolicy: 'no-referrer'
-  });
+  let response;
+  try {
+    response = await fetch(url, {
+      mode: 'cors',
+      credentials: 'omit',
+      referrerPolicy: 'no-referrer',
+      signal: controller.signal
+    });
+  } finally {
+    abortControllers.delete(url);
+  }
 
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}`);
@@ -364,6 +395,37 @@ export const cancelPending = (urls) => {
       queue.splice(i, 1);
     }
   }
+  // Abort in-flight requests
+  for (const url of urls) {
+    const controller = abortControllers.get(url);
+    if (controller) {
+      controller.abort();
+      abortControllers.delete(url);
+    }
+  }
+};
+
+/**
+ * Cancel ALL pending and in-flight requests (for album switch)
+ */
+export const cancelAll = () => {
+  // Increment generation to invalidate any in-progress async operations
+  cancelGeneration++;
+
+  // Clear the queue
+  queue.length = 0;
+
+  // Abort all in-flight requests
+  for (const controller of abortControllers.values()) {
+    controller.abort();
+  }
+  abortControllers.clear();
+
+  // Clear loading promises (they will reject due to abort)
+  loadingPromises.clear();
+
+  // Reset active count to allow new requests immediately
+  activeCount = 0;
 };
 
 /**

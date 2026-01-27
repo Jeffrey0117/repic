@@ -233,6 +233,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return await ipcRenderer.invoke('proxy-image', url);
     },
 
+    // Proxy image using hidden browser window - for very strict sites (postimg, etc)
+    proxyImageBrowser: async (url) => {
+        if (!url || typeof url !== 'string' || !url.startsWith('http')) {
+            return { success: false, error: 'Invalid URL' };
+        }
+        return await ipcRenderer.invoke('proxy-image-browser', url);
+    },
+
     // Set always on top
     setAlwaysOnTop: async (value) => {
         return await ipcRenderer.invoke('set-always-on-top', !!value);
@@ -305,5 +313,36 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Remove thumbnail listener
     offThumbnailReady: (callback) => {
         ipcRenderer.removeListener('thumbnail-ready', callback);
+    },
+
+    // Prefetch images to local temp - streaming download
+    prefetchImages: async (urls, options = {}) => {
+        if (!Array.isArray(urls) || urls.length === 0) {
+            return { success: false, error: 'No URLs provided' };
+        }
+        const { onProgress } = options;
+        const requestId = `prefetch-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+        // Set up listener for streaming results
+        if (onProgress) {
+            const handler = (_event, data) => {
+                if (data.requestId === requestId && data.item) {
+                    onProgress(data.item);
+                }
+            };
+            ipcRenderer.on('prefetch-ready', handler);
+
+            // Auto-cleanup after 5 minutes
+            setTimeout(() => {
+                ipcRenderer.removeListener('prefetch-ready', handler);
+            }, 300000);
+        }
+
+        return await ipcRenderer.invoke('prefetch-images', { urls, requestId });
+    },
+
+    // Listen for prefetch stream events
+    onPrefetchReady: (callback) => {
+        ipcRenderer.on('prefetch-ready', (_event, data) => callback(data));
     }
 });

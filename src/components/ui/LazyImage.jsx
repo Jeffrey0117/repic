@@ -60,6 +60,7 @@ export const LazyImage = memo(({
     }, []);
 
     // Load image when visible
+    // Strategy: fetch() -> Node proxy -> browser proxy (page-level)
     useEffect(() => {
         if (!isVisible || !src) return;
         if (loadedSrc) return; // Already loaded
@@ -119,13 +120,18 @@ export const LazyImage = memo(({
             .catch(async (err) => {
                 clearTimeout(timeoutId);
                 if (cancelled) return;
+                // Don't retry if request was intentionally aborted (album switch)
+                if (err?.name === 'AbortError') {
+                    setIsLoading(false);
+                    return;
+                }
+
+                // Layer 2: Try Node.js proxy (handles most CORS)
                 console.log('[LazyImage] Load failed, trying proxy:', src);
-                // Try proxy if direct load fails (CORS issues)
                 if (electronAPI?.proxyImage) {
                     try {
                         const result = await electronAPI.proxyImage(src);
-                        if (result.success) {
-                            // Cache the proxy result for future use (including thumbnail generation)
+                        if (!cancelled && result.success) {
                             cacheProxyResult(src, result.data);
                             setLoadedSrc(result.data);
                             setIsLoading(false);
@@ -133,12 +139,33 @@ export const LazyImage = memo(({
                             return;
                         }
                     } catch (e) {
-                        // Proxy also failed
+                        // Continue to browser proxy
                     }
                 }
-                setHasError(true);
-                setIsLoading(false);
-                onError?.(err);
+
+                // Layer 3: Try browser proxy (hidden window, loads host page)
+                // For strict sites like postimg that block all direct requests
+                console.log('[LazyImage] Node proxy failed, trying browser proxy:', src);
+                if (!cancelled && electronAPI?.proxyImageBrowser) {
+                    try {
+                        const result = await electronAPI.proxyImageBrowser(src);
+                        if (!cancelled && result.success) {
+                            cacheProxyResult(src, result.data);
+                            setLoadedSrc(result.data);
+                            setIsLoading(false);
+                            onLoad?.();
+                            return;
+                        }
+                    } catch (e) {
+                        // All methods failed
+                    }
+                }
+
+                if (!cancelled) {
+                    setHasError(true);
+                    setIsLoading(false);
+                    onError?.(err);
+                }
             });
 
         return () => {
