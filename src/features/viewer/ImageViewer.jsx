@@ -64,6 +64,73 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
         setProxiedSrc(null);
         setLoadFailed(false);
 
+        // Handle .repic virtual image files
+        if (src.toLowerCase().endsWith('.repic')) {
+            if (electronAPI?.readRepicFile) {
+                setIsLoading(true);
+                (async () => {
+                    try {
+                        const result = await electronAPI.readRepicFile(src);
+                        if (result.success && result.data?.url) {
+                            // Use the URL from .repic file
+                            const actualSrc = result.data.url;
+
+                            // Check cache first
+                            const cached = getCached(actualSrc);
+                            if (cached) {
+                                setProxiedSrc(cached);
+                                setIsLoading(false);
+                                return;
+                            }
+
+                            // Load the actual URL
+                            loadImage(actualSrc, PRIORITY_HIGH)
+                                .then((data) => {
+                                    setProxiedSrc(data);
+                                    setIsLoading(false);
+                                })
+                                .catch(async (err) => {
+                                    // Try fallback proxies
+                                    if (electronAPI?.proxyImage) {
+                                        try {
+                                            const proxyResult = await electronAPI.proxyImage(actualSrc);
+                                            if (proxyResult.success) {
+                                                setProxiedSrc(proxyResult.data);
+                                                setIsLoading(false);
+                                                return;
+                                            }
+                                        } catch (e) {}
+                                    }
+
+                                    if (electronAPI?.proxyImageBrowser) {
+                                        try {
+                                            const browserResult = await electronAPI.proxyImageBrowser(actualSrc);
+                                            if (browserResult.success) {
+                                                setProxiedSrc(browserResult.data);
+                                                setIsLoading(false);
+                                                return;
+                                            }
+                                        } catch (e) {}
+                                    }
+
+                                    setIsLoading(false);
+                                    setLoadFailed(true);
+                                });
+                        } else {
+                            setIsLoading(false);
+                            setLoadFailed(true);
+                        }
+                    } catch (err) {
+                        setIsLoading(false);
+                        setLoadFailed(true);
+                    }
+                })();
+            } else {
+                setLoadFailed(true);
+            }
+            return;
+        }
+
         // Local files: no loading state needed
         const isLocal = src.startsWith('file://') || src.startsWith('data:');
         if (isLocal) {
