@@ -15,6 +15,7 @@ import { ContextMenu } from './components/ui/ContextMenu';
 import { Copy, Download, FolderOutput, Trash2, Pencil } from './components/icons';
 import { prepareSingleExport } from './utils/repicFile';
 import { AlbumSidebar } from './features/album/AlbumSidebar';
+import { ThumbnailGrid } from './components/album/ThumbnailGrid';
 import { useFileSystem } from './hooks/useFileSystem';
 import { useWebAlbums } from './hooks/useWebAlbums';
 import { useConfirmDialog } from './hooks/useConfirmDialog';
@@ -93,6 +94,16 @@ function App() {
 
   // View mode: 'local' for file system view, 'album' for web album view
   const [viewMode, setViewMode] = useState('local');
+
+  // Album view mode: 'grid' for thumbnail grid, 'image' for single image viewer
+  const [albumViewMode, setAlbumViewMode] = useState(() => {
+    return localStorage.getItem('repic-album-view-mode') || 'grid';
+  });
+
+  // Local view mode: 'grid' or 'image'
+  const [localViewMode, setLocalViewMode] = useState(() => {
+    return localStorage.getItem('repic-local-view-mode') || 'grid';
+  });
 
   // Album sidebar collapsed state
   const [albumSidebarCollapsed, setAlbumSidebarCollapsed] = useState(false);
@@ -1038,6 +1049,16 @@ function App() {
     clearPrefetch(); // Clear old prefetch when switching albums
   }, [selectedAlbumId]);
 
+  // Persist album view mode to localStorage
+  useEffect(() => {
+    localStorage.setItem('repic-album-view-mode', albumViewMode);
+  }, [albumViewMode]);
+
+  // Persist local view mode to localStorage
+  useEffect(() => {
+    localStorage.setItem('repic-local-view-mode', localViewMode);
+  }, [localViewMode]);
+
   // Prefetch images around current index (sliding window via Go)
   useEffect(() => {
     if (viewMode !== 'album' || !selectedAlbum?.images?.length) return;
@@ -1309,16 +1330,30 @@ function App() {
           setVirtualImageData(null);
         }
       } else if (viewMode === 'album') {
-        if (e.key === 'ArrowRight') nextAlbumImage();
-        if (e.key === 'ArrowLeft') prevAlbumImage();
+        // ESC: return to grid view from image view
+        if (e.key === 'Escape' && albumViewMode === 'image') {
+          setAlbumViewMode('grid');
+        }
+        // Arrow keys: navigate images (only in image mode)
+        if (albumViewMode === 'image') {
+          if (e.key === 'ArrowRight') nextAlbumImage();
+          if (e.key === 'ArrowLeft') prevAlbumImage();
+        }
       } else {
-        if (e.key === 'ArrowRight') nextImage();
-        if (e.key === 'ArrowLeft') prevImage();
+        // Local mode
+        if (e.key === 'Escape' && localViewMode === 'image') {
+          setLocalViewMode('grid');
+        }
+        // Arrow keys: navigate images (only in image mode)
+        if (localViewMode === 'image') {
+          if (e.key === 'ArrowRight') nextImage();
+          if (e.key === 'ArrowLeft') prevImage();
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isEditing, viewMode, nextImage, prevImage, nextAlbumImage, prevAlbumImage, nextVirtualImage, prevVirtualImage]);
+  }, [isEditing, viewMode, albumViewMode, localViewMode, nextImage, prevImage, nextAlbumImage, prevAlbumImage, nextVirtualImage, prevVirtualImage]);
 
   // Paste from clipboard (Ctrl+V / Cmd+V)
   useEffect(() => {
@@ -1611,8 +1646,8 @@ function App() {
         <div className={`flex-1 flex min-w-0 overflow-hidden ${sidebarPosition === 'bottom' ? 'flex-col' : 'flex-row'}`}>
           {/* Inner row: (Sidebar if left) + main + InfoPanel */}
           <div className="flex flex-row flex-1 min-h-0 min-w-0 overflow-hidden">
-            {/* Left Sidebar: Thumbnail Explorer - only when position is left */}
-            {sidebarPosition === 'left' && ((viewMode === 'album' && albumImages.length > 0) || (viewMode !== 'album' && files.length > 0)) && (
+            {/* Left Sidebar: Thumbnail Explorer - only when position is left, hidden in grid mode */}
+            {sidebarPosition === 'left' && ((viewMode === 'album' && albumViewMode === 'image' && albumImages.length > 0) || (viewMode === 'local' && localViewMode === 'image' && files.length > 0)) && (
               <Sidebar
                 files={viewMode === 'album' ? albumImages : files}
                 currentIndex={viewMode === 'album' ? safeAlbumIndex : currentIndex}
@@ -1668,8 +1703,41 @@ function App() {
                 </motion.div>
               ) : null
             ) : viewMode === 'album' ? (
-              // Album mode
-              currentAlbumImage ? (
+              // Album mode - two view modes: grid or image
+              albumViewMode === 'grid' && albumImages.length > 0 ? (
+                // Grid view - thumbnail grid
+                <motion.div
+                  key="album-grid"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 z-10 bg-[#0A0A0A]"
+                >
+                  <ThumbnailGrid
+                    images={albumImages}
+                    currentIndex={safeAlbumIndex}
+                    onSelectImage={(index) => {
+                      setAlbumImageIndex(index);
+                      setAlbumViewMode('image');
+                    }}
+                    size="medium"
+                    isMultiSelectMode={isMultiSelectMode}
+                    selectedImageIds={selectedImageIds}
+                    onToggleSelect={(imageId) => {
+                      setSelectedImageIds(prev => {
+                        const newSet = new Set(prev);
+                        if (newSet.has(imageId)) {
+                          newSet.delete(imageId);
+                        } else {
+                          newSet.add(imageId);
+                        }
+                        return newSet;
+                      });
+                    }}
+                  />
+                </motion.div>
+              ) : albumViewMode === 'image' && currentAlbumImage ? (
+                // Image view - single image viewer
                 <motion.div
                   key="album-viewer"
                   initial={{ opacity: 0 }}
@@ -1681,6 +1749,19 @@ function App() {
                   <div className="w-full h-full p-4">
                     <ImageViewer src={currentAlbumImage} crop={albumImages[safeAlbumIndex]?.crop} annotations={albumImages[safeAlbumIndex]?.annotations} />
                   </div>
+                  {/* Back to grid button */}
+                  <button
+                    onClick={() => setAlbumViewMode('grid')}
+                    className="absolute top-4 left-4 bg-white/10 hover:bg-white/20 text-white p-3 rounded-lg transition-colors backdrop-blur-sm"
+                    title="Grid View"
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="3" y="3" width="7" height="7" />
+                      <rect x="14" y="3" width="7" height="7" />
+                      <rect x="3" y="14" width="7" height="7" />
+                      <rect x="14" y="14" width="7" height="7" />
+                    </svg>
+                  </button>
                 </motion.div>
               ) : (
                 <motion.div
@@ -1740,8 +1821,28 @@ function App() {
                 </motion.div>
               )
             ) : (
-              // Local mode
-              localImage && !isEditing ? (
+              // Local mode - two view modes: grid or image
+              localViewMode === 'grid' && files.length > 0 ? (
+                // Grid view
+                <motion.div
+                  key="local-grid"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 z-10 bg-[#0A0A0A]"
+                >
+                  <ThumbnailGrid
+                    images={files.map((file, idx) => ({ id: idx, url: file, src: file, name: getElectronAPI()?.path?.basename(file) }))}
+                    currentIndex={currentIndex}
+                    onSelectImage={(index) => {
+                      selectImage(index);
+                      setLocalViewMode('image');
+                    }}
+                    size="medium"
+                  />
+                </motion.div>
+              ) : localViewMode === 'image' && localImage && !isEditing ? (
+                // Image view
                 <motion.div
                   key="viewer"
                   initial={{ opacity: 0 }}
@@ -1752,6 +1853,21 @@ function App() {
                   <div className="w-full h-full p-4">
                     <ImageViewer src={localImage} crop={localCrop} annotations={localAnnotations} />
                   </div>
+                  {/* Back to grid button */}
+                  {files.length > 0 && (
+                    <button
+                      onClick={() => setLocalViewMode('grid')}
+                      className="absolute top-4 left-4 bg-white/10 hover:bg-white/20 text-white p-3 rounded-lg transition-colors backdrop-blur-sm"
+                      title="Grid View"
+                    >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="3" y="3" width="7" height="7" />
+                        <rect x="14" y="3" width="7" height="7" />
+                        <rect x="3" y="14" width="7" height="7" />
+                        <rect x="14" y="14" width="7" height="7" />
+                      </svg>
+                    </button>
+                  )}
                 </motion.div>
               ) : !localImage ? (
                 <motion.div
@@ -1786,8 +1902,8 @@ function App() {
         />
         </div>
 
-        {/* Bottom Sidebar: Thumbnail Explorer - only when position is bottom */}
-        {sidebarPosition === 'bottom' && ((viewMode === 'album' && albumImages.length > 0) || (viewMode !== 'album' && files.length > 0)) && (
+        {/* Bottom Sidebar: Thumbnail Explorer - only when position is bottom, hidden in grid mode */}
+        {sidebarPosition === 'bottom' && ((viewMode === 'album' && albumViewMode === 'image' && albumImages.length > 0) || (viewMode === 'local' && localViewMode === 'image' && files.length > 0)) && (
           <Sidebar
             files={viewMode === 'album' ? albumImages : files}
             currentIndex={viewMode === 'album' ? safeAlbumIndex : currentIndex}
