@@ -631,7 +631,7 @@ export const Sidebar = ({
 
                             <div
                                 className={`
-                                    rounded-lg overflow-hidden border-2 transition-all duration-200 shadow-lg bg-black/50 relative
+                                    rounded-lg overflow-hidden border-2 transition-all duration-200 bg-black/50 relative
                                     ${isSelected ? 'border-green-500' : isActive ? 'border-primary' : 'border-transparent group-hover:border-white/20'}
                                     ${isDragOver ? 'border-primary border-dashed' : ''}
                                 `}
