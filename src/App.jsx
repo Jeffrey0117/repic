@@ -60,6 +60,7 @@ function App() {
     addImages: addAlbumImages,
     removeImage: removeAlbumImage,
     updateImageCrop,
+    updateImageData,
     reorderImages,
     updateAlbumImages,
     exportAlbums,
@@ -124,6 +125,9 @@ function App() {
   // Multi-select state for album mode
   const [selectedImageIds, setSelectedImageIds] = useState(new Set());
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
+
+  // Background removal state
+  const [processingImageIds, setProcessingImageIds] = useState(new Set());
 
   // Custom confirm dialog
   const [confirm, confirmDialogProps] = useConfirmDialog();
@@ -257,7 +261,7 @@ function App() {
     [albumImages.length, albumImageIndex]
   );
   const currentAlbumImage = useMemo(() =>
-    albumImages.length > 0 ? (albumImages[safeAlbumIndex]?.url || null) : null,
+    albumImages.length > 0 ? (albumImages[safeAlbumIndex]?.processedUrl || albumImages[safeAlbumIndex]?.url || null) : null,
     [albumImages, safeAlbumIndex]
   );
 
@@ -772,6 +776,82 @@ function App() {
       setSelectedImageIds(allIds);
     }
   }, [selectedAlbum]);
+
+  // Remove background from images
+  const handleRemoveBackground = useCallback(async (imagesToProcess, isBatch = false) => {
+    if (!selectedAlbumId || !imagesToProcess || imagesToProcess.length === 0) return;
+
+    const electronAPI = getElectronAPI();
+    if (!electronAPI?.removeBackground) {
+      setToast({ visible: true, message: 'Background removal not available' });
+      return;
+    }
+
+    // Mark images as processing
+    const processingIds = new Set(imagesToProcess.map(img => img.id));
+    setProcessingImageIds(processingIds);
+
+    // Show processing message
+    if (isBatch) {
+      setToast({ visible: true, message: `Removing background from ${imagesToProcess.length} images...` });
+    } else {
+      setToast({ visible: true, message: 'Removing background...' });
+    }
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    // Process each image
+    for (const image of imagesToProcess) {
+      try {
+        const imageSrc = image.processedUrl || image.url;
+        const result = await electronAPI.removeBackground(imageSrc);
+
+        if (result.success) {
+          // Update the image with the background-removed version
+          updateImageData(selectedAlbumId, image.id, {
+            processedUrl: result.data,
+            hasBackgroundRemoved: true
+          });
+          successCount++;
+        } else {
+          console.error('Background removal failed:', result.error);
+          errorCount++;
+        }
+      } catch (error) {
+        console.error('Background removal error:', error);
+        errorCount++;
+      }
+
+      // Remove from processing set
+      setProcessingImageIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(image.id);
+        return newSet;
+      });
+    }
+
+    // Show result message
+    if (isBatch) {
+      if (errorCount === 0) {
+        setToast({ visible: true, message: `Successfully processed ${successCount} images` });
+      } else {
+        setToast({ visible: true, message: `Processed ${successCount} images, ${errorCount} failed` });
+      }
+      // Clear selection after batch operation
+      setSelectedImageIds(new Set());
+      setIsMultiSelectMode(false);
+    } else {
+      if (errorCount === 0) {
+        setToast({ visible: true, message: 'Background removed successfully' });
+      } else {
+        setToast({ visible: true, message: 'Failed to remove background' });
+      }
+    }
+
+    // Clear processing state
+    setProcessingImageIds(new Set());
+  }, [selectedAlbumId, updateImageData]);
 
   // Move selected images up
   const handleMoveUp = useCallback(() => {
@@ -1768,6 +1848,7 @@ function App() {
                     size="medium"
                     isMultiSelectMode={isMultiSelectMode}
                     selectedImageIds={selectedImageIds}
+                    processingImageIds={processingImageIds}
                     onToggleSelect={(imageId) => {
                       setSelectedImageIds(prev => {
                         const newSet = new Set(prev);
@@ -1779,6 +1860,7 @@ function App() {
                         return newSet;
                       });
                     }}
+                    onRemoveBackground={handleRemoveBackground}
                   />
                 </motion.div>
               ) : albumViewMode === 'image' && currentAlbumImage ? (

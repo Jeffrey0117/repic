@@ -1,4 +1,7 @@
+import { useState } from 'react';
 import { LazyImage } from '../ui/LazyImage';
+import { ContextMenu } from '../ui/ContextMenu';
+import { Scissors, Layers } from '../icons';
 
 /**
  * ThumbnailGrid - Grid view for album images
@@ -9,7 +12,9 @@ import { LazyImage } from '../ui/LazyImage';
  * @param {string} size - Grid size: 'small' | 'medium' | 'large'
  * @param {boolean} isMultiSelectMode - Multi-select mode
  * @param {Set} selectedImageIds - Selected image IDs
+ * @param {Set} processingImageIds - IDs of images being processed
  * @param {Function} onToggleSelect - Toggle image selection
+ * @param {Function} onRemoveBackground - Callback for removing background from image(s)
  */
 export const ThumbnailGrid = ({
   images,
@@ -18,7 +23,9 @@ export const ThumbnailGrid = ({
   size = 'medium',
   isMultiSelectMode = false,
   selectedImageIds = new Set(),
-  onToggleSelect
+  processingImageIds = new Set(),
+  onToggleSelect,
+  onRemoveBackground
 }) => {
   // Grid sizes (in pixels)
   const sizes = {
@@ -27,6 +34,73 @@ export const ThumbnailGrid = ({
     large: 256
   };
   const thumbSize = sizes[size];
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState({
+    isOpen: false,
+    position: { x: 0, y: 0 },
+    targetImage: null,
+    targetIndex: null
+  });
+
+  // Handle right-click on thumbnail
+  const handleContextMenu = (e, image, index) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    setContextMenu({
+      isOpen: true,
+      position: { x: e.clientX, y: e.clientY },
+      targetImage: image,
+      targetIndex: index
+    });
+  };
+
+  // Close context menu
+  const closeContextMenu = () => {
+    setContextMenu({
+      isOpen: false,
+      position: { x: 0, y: 0 },
+      targetImage: null,
+      targetIndex: null
+    });
+  };
+
+  // Handle remove background action
+  const handleRemoveBackground = () => {
+    if (isMultiSelectMode && selectedImageIds.size > 0) {
+      // Batch remove background for selected images
+      const selectedImages = images.filter(img => selectedImageIds.has(img.id));
+      onRemoveBackground?.(selectedImages, true);
+    } else if (contextMenu.targetImage) {
+      // Single image remove background
+      onRemoveBackground?.([contextMenu.targetImage], false);
+    }
+  };
+
+  // Context menu items
+  const getContextMenuItems = () => {
+    const items = [];
+
+    // Remove Background option
+    if (onRemoveBackground) {
+      if (isMultiSelectMode && selectedImageIds.size > 0) {
+        items.push({
+          label: `Remove Background (${selectedImageIds.size} images)`,
+          icon: Scissors,
+          onClick: handleRemoveBackground
+        });
+      } else {
+        items.push({
+          label: 'Remove Background',
+          icon: Scissors,
+          onClick: handleRemoveBackground
+        });
+      }
+    }
+
+    return items;
+  };
 
   return (
     <div className="w-full h-full overflow-y-auto overflow-x-hidden p-4 bg-[#0A0A0A]">
@@ -39,6 +113,7 @@ export const ThumbnailGrid = ({
         {images.map((image, index) => {
           const isSelected = selectedImageIds.has(image.id);
           const isCurrent = index === currentIndex;
+          const isProcessing = processingImageIds.has(image.id);
 
           return (
             <div
@@ -61,10 +136,11 @@ export const ThumbnailGrid = ({
                   onSelectImage(index);
                 }
               }}
+              onContextMenu={(e) => handleContextMenu(e, image, index)}
             >
               {/* Thumbnail */}
               <LazyImage
-                src={image.url || image.src}
+                src={image.processedUrl || image.url || image.src}
                 alt={image.name || `Image ${index + 1}`}
                 className="w-full h-full"
                 useThumbnail
@@ -106,6 +182,23 @@ export const ThumbnailGrid = ({
                   Current
                 </div>
               )}
+
+              {/* Background removed indicator */}
+              {image.hasBackgroundRemoved && !isProcessing && (
+                <div className="absolute bottom-2 right-2 bg-green-500/90 p-1 rounded backdrop-blur-sm" title="Background removed">
+                  <Scissors size={12} className="text-white" />
+                </div>
+              )}
+
+              {/* Processing indicator */}
+              {isProcessing && (
+                <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-sm">
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-8 h-8 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span className="text-xs text-white/80">Processing...</span>
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}
@@ -122,6 +215,14 @@ export const ThumbnailGrid = ({
           <p className="text-lg">No images in this album</p>
         </div>
       )}
+
+      {/* Context Menu */}
+      <ContextMenu
+        isOpen={contextMenu.isOpen}
+        position={contextMenu.position}
+        onClose={closeContextMenu}
+        items={getContextMenuItems()}
+      />
     </div>
   );
 };

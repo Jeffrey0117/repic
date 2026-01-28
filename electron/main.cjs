@@ -6,7 +6,13 @@ const os = require('os');
 const https = require('https');
 const http = require('http');
 const crypto = require('crypto');
-const sharp = require('sharp');
+let sharp;
+try {
+    sharp = require('sharp');
+} catch (e) {
+    console.error('[main] Failed to load sharp:', e.message);
+    sharp = null;
+}
 
 // Temp directory for drag & drop
 const TEMP_DIR = path.join(os.tmpdir(), 'repic-temp');
@@ -692,6 +698,9 @@ function setupIpcHandlers() {
 
     // Remove background from image
     ipcMain.handle('remove-background', async (event, { imageSrc }) => {
+        if (!sharp) {
+            return { success: false, error: 'sharp module not available' };
+        }
         try {
             let inputBuffer;
 

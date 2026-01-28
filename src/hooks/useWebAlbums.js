@@ -250,6 +250,22 @@ export const useWebAlbums = () => {
     ));
   }, []);
 
+  // Update image data (for background removal, etc.)
+  const updateImageData = useCallback((albumId, imageId, updates) => {
+    setAlbums(prev => prev.map(album =>
+      album.id === albumId
+        ? {
+            ...album,
+            images: album.images.map(img =>
+              img.id === imageId
+                ? { ...img, ...updates }
+                : img
+            )
+          }
+        : album
+    ));
+  }, []);
+
   // Select album (immediate switch)
   const selectAlbum = useCallback((albumId) => {
     // Cancel pending image loads BEFORE switching (prevents old album blocking new)
@@ -349,6 +365,7 @@ export const useWebAlbums = () => {
     getDeletedImages,
     updateImageCrop,
     clearImageCrop,
+    updateImageData,
     reorderImages,
     updateAlbumImages,
     exportAlbums,

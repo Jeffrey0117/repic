@@ -107,7 +107,6 @@ export const ImageCropper = ({ imageSrc, onCancel, onComplete, fileCount = 1, on
                         crop={crop}
                         onChange={(_, percentCrop) => setCrop(percentCrop)}
                         onComplete={(c) => setCompletedCrop(c)}
-                        className="shadow-2xl"
                         disabled={!!activeTool}
                     >
                         <img

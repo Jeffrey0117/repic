@@ -330,7 +330,6 @@ export const ImageEditor = ({
             crop={crop}
             onChange={(_, percentCrop) => setCrop(percentCrop)}
             onComplete={(c) => setCompletedCrop(c)}
-            className="shadow-2xl"
             disabled={activeTab !== TABS.CROP}
             style={{
               // Checkerboard pattern for transparency (white + light gray)
