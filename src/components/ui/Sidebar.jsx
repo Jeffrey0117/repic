@@ -669,16 +669,32 @@ export const Sidebar = ({
                                         }
                                     />
                                 ) : imgSrc ? (
-                                    // Local files: direct img tag
-                                    <img
-                                        src={imgSrc}
-                                        alt=""
-                                        className="w-full h-full object-contain pointer-events-none"
-                                        style={clipPath ? { clipPath } : undefined}
-                                        loading="lazy"
-                                        draggable={false}
-                                        referrerPolicy="no-referrer"
-                                    />
+                                    // Local files: with checkerboard background for transparency
+                                    <div
+                                        className="w-full h-full"
+                                        style={{
+                                            // Checkerboard pattern for transparency
+                                            backgroundImage: `
+                                                linear-gradient(45deg, #CCCCCC 25%, transparent 25%),
+                                                linear-gradient(-45deg, #CCCCCC 25%, transparent 25%),
+                                                linear-gradient(45deg, transparent 75%, #CCCCCC 75%),
+                                                linear-gradient(-45deg, transparent 75%, #CCCCCC 75%)
+                                            `,
+                                            backgroundSize: '16px 16px',
+                                            backgroundPosition: '0 0, 0 8px, 8px -8px, -8px 0px',
+                                            backgroundColor: '#FFFFFF'
+                                        }}
+                                    >
+                                        <img
+                                            src={imgSrc}
+                                            alt=""
+                                            className="w-full h-full object-contain pointer-events-none"
+                                            style={clipPath ? { clipPath } : undefined}
+                                            loading="lazy"
+                                            draggable={false}
+                                            referrerPolicy="no-referrer"
+                                        />
+                                    </div>
                                 ) : (
                                     // Loading spinner for .repic files loading
                                     isRepic ? (
