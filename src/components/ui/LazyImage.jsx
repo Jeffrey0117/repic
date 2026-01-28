@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, memo } from 'react';
 import { loadImage, loadThumbnail, getCached, getCachedThumbnail, cacheProxyResult, PRIORITY_HIGH, PRIORITY_NORMAL, PRIORITY_LOW } from '../../utils/imageLoader';
+import { hasImageTransparency, isPNGFormat } from '../../utils/imageUtils';
 
 const electronAPI = window.electronAPI || null;
 
@@ -34,6 +35,7 @@ export const LazyImage = memo(({
     const [isLoading, setIsLoading] = useState(!loadedSrc);
     const [hasError, setHasError] = useState(false);
     const [isVisible, setIsVisible] = useState(false);
+    const [detectedTransparency, setDetectedTransparency] = useState(false);
 
     // Intersection Observer for visibility detection
     useEffect(() => {
@@ -276,6 +278,20 @@ export const LazyImage = memo(({
         }
     }, [src, useThumbnail]);
 
+    // Detect transparency when image loads
+    useEffect(() => {
+        if (!loadedSrc || hasError) return;
+
+        // Only detect for PNG format images to save performance
+        if (isPNGFormat(loadedSrc)) {
+            hasImageTransparency(loadedSrc).then((hasAlpha) => {
+                setDetectedTransparency(hasAlpha);
+            });
+        } else {
+            setDetectedTransparency(false);
+        }
+    }, [loadedSrc, hasError]);
+
     if (hasError) {
         return fallbackElement || (
             <div ref={imgRef} className={`flex items-center justify-center bg-black/30 text-white/40 ${className}`} style={style}>
@@ -284,12 +300,8 @@ export const LazyImage = memo(({
         );
     }
 
-    // Check if image is PNG (likely has transparency)
-    const isPNG = src && (
-        src.toLowerCase().includes('.png') ||
-        src.toLowerCase().includes('image/png') ||
-        src.toLowerCase().includes('data:image/png')
-    );
+    // Show checkerboard if: 1) explicitly marked, 2) detected transparency, or 3) PNG format (optimistic)
+    const shouldShowCheckerboard = hasTransparency || detectedTransparency || isPNGFormat(src);
 
     return (
         <div
@@ -297,8 +309,8 @@ export const LazyImage = memo(({
             className={`relative ${className}`}
             style={{
                 ...style,
-                // Only show checkerboard for PNG or images marked as having transparency
-                ...(hasTransparency || isPNG ? {
+                // Only show checkerboard for images with actual transparency
+                ...(shouldShowCheckerboard ? {
                     backgroundImage: `
                         linear-gradient(45deg, #CCCCCC 25%, transparent 25%),
                         linear-gradient(-45deg, #CCCCCC 25%, transparent 25%),

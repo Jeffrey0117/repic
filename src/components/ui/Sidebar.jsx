@@ -3,6 +3,7 @@ import { getThumbnail, saveThumbnail, generateThumbnail } from '../../utils/thum
 import { getCachedImage, cacheImage } from '../../utils/offlineCache';
 import { preloadImages, preloadThumbnails, getCached } from '../../utils/imageLoader';
 import { LazyImage } from './LazyImage';
+import { hasImageTransparency, isPNGFormat } from '../../utils/imageUtils';
 
 const SIDEBAR_WIDTH_KEY = 'sidebar-width';
 const SIDEBAR_HEIGHT_KEY = 'sidebar-height';
@@ -61,6 +62,8 @@ export const Sidebar = ({
     const [failedImages, setFailedImages] = useState(new Set());
     // Cached thumbnails for local files
     const [cachedThumbs, setCachedThumbs] = useState({});
+    // Track images with transparency
+    const [transparentImages, setTransparentImages] = useState(new Set());
     // Separate width (for left) and height (for bottom)
     const [width, setWidth] = useState(() => {
         const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
@@ -669,16 +672,16 @@ export const Sidebar = ({
                                         }
                                     />
                                 ) : imgSrc ? (
-                                    // Local files: only show checkerboard for PNG files
+                                    // Local files: detect and show checkerboard for transparent images
                                     (() => {
-                                        const isPNG = imgSrc.toLowerCase().includes('.png') ||
-                                                     imgSrc.toLowerCase().includes('image/png') ||
-                                                     imgSrc.toLowerCase().includes('data:image/png');
+                                        const hasTransparency = transparentImages.has(fileUrl);
+                                        const isPNG = isPNGFormat(imgSrc);
+
                                         return (
                                             <div
                                                 className="w-full h-full"
-                                                style={isPNG ? {
-                                                    // Checkerboard pattern for PNG (transparency)
+                                                style={hasTransparency || isPNG ? {
+                                                    // Checkerboard pattern for images with transparency
                                                     backgroundImage: `
                                                         linear-gradient(45deg, #CCCCCC 25%, transparent 25%),
                                                         linear-gradient(-45deg, #CCCCCC 25%, transparent 25%),
@@ -698,6 +701,15 @@ export const Sidebar = ({
                                                     loading="lazy"
                                                     draggable={false}
                                                     referrerPolicy="no-referrer"
+                                                    onLoad={async (e) => {
+                                                        // Detect transparency after image loads
+                                                        if (isPNG && !transparentImages.has(fileUrl)) {
+                                                            const hasAlpha = await hasImageTransparency(imgSrc);
+                                                            if (hasAlpha) {
+                                                                setTransparentImages(prev => new Set([...prev, fileUrl]));
+                                                            }
+                                                        }
+                                                    }}
                                                 />
                                             </div>
                                         );
