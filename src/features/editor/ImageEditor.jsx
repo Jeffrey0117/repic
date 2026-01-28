@@ -13,7 +13,8 @@ const TABS = {
   CROP: 'crop',
   ANNOTATE: 'annotate',
   MOSAIC: 'mosaic',
-  COMPRESS: 'compress'
+  COMPRESS: 'compress',
+  REMOVE_BG: 'removebg'
 };
 
 export const ImageEditor = ({
@@ -42,6 +43,10 @@ export const ImageEditor = ({
   // Compress state
   const [quality, setQuality] = useState(85);
   const [estimatedSize, setEstimatedSize] = useState(null);
+
+  // Remove background state
+  const [isRemovingBg, setIsRemovingBg] = useState(false);
+  const [removedBgImage, setRemovedBgImage] = useState(null);
 
   const imgRef = useRef(null);
 
@@ -88,7 +93,36 @@ export const ImageEditor = ({
     estimateCompressedSize(q);
   };
 
+  // Handle background removal
+  const handleRemoveBackground = async () => {
+    const electronAPI = window.electronAPI;
+    if (!electronAPI?.removeBackground) {
+      console.error('Background removal not available');
+      return;
+    }
+
+    setIsRemovingBg(true);
+    try {
+      const result = await electronAPI.removeBackground(imageSrc);
+      if (result.success) {
+        setRemovedBgImage(result.data);
+      } else {
+        console.error('Background removal failed:', result.error);
+      }
+    } catch (error) {
+      console.error('Background removal error:', error);
+    } finally {
+      setIsRemovingBg(false);
+    }
+  };
+
   const handleSave = async () => {
+    // If background was removed, use the removed background image
+    if (activeTab === TABS.REMOVE_BG && removedBgImage) {
+      onComplete(removedBgImage);
+      return;
+    }
+
     // For virtual images, return crop parameters
     if (isVirtual && crop) {
       onComplete({
@@ -208,6 +242,34 @@ export const ImageEditor = ({
           </div>
         );
 
+      case TABS.REMOVE_BG:
+        return (
+          <div className="flex flex-col items-center gap-3 w-full max-w-md mx-auto">
+            <button
+              onClick={handleRemoveBackground}
+              disabled={isRemovingBg || !!removedBgImage}
+              className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${
+                removedBgImage
+                  ? isDark
+                    ? 'bg-green-500/20 text-green-400 cursor-default'
+                    : 'bg-green-500/20 text-green-600 cursor-default'
+                  : isRemovingBg
+                    ? isDark
+                      ? 'bg-white/5 text-white/40 cursor-wait'
+                      : 'bg-black/5 text-black/40 cursor-wait'
+                    : 'bg-primary text-white hover:bg-blue-600'
+              }`}
+            >
+              {isRemovingBg ? '處理中...' : removedBgImage ? '✓ 去背完成' : '一鍵去背'}
+            </button>
+            {removedBgImage && (
+              <p className={`text-xs ${isDark ? 'text-white/40' : 'text-black/40'}`}>
+                背景已移除，點擊「完成」保存
+              </p>
+            )}
+          </div>
+        );
+
       case TABS.CROP:
       default:
         return (
@@ -235,6 +297,7 @@ export const ImageEditor = ({
     { id: TABS.ANNOTATE, label: t('annotate') || '标注' },
     { id: TABS.MOSAIC, label: t('mosaic') || '马赛克' },
     { id: TABS.COMPRESS, label: t('compress') || '压缩' },
+    { id: TABS.REMOVE_BG, label: t('removeBg') || '去背' },
   ];
 
   // Handle tab change
@@ -247,6 +310,12 @@ export const ImageEditor = ({
       setActiveTool('rect');
     } else if (tabId === TABS.MOSAIC) {
       setActiveTool('blur');
+    } else if (tabId === TABS.REMOVE_BG) {
+      setActiveTool(null);
+      // Reset background removal state when switching away
+      if (activeTab !== TABS.REMOVE_BG) {
+        setRemovedBgImage(null);
+      }
     } else {
       setActiveTool(null);
     }
@@ -278,7 +347,7 @@ export const ImageEditor = ({
           >
             <img
               ref={imgRef}
-              src={imageSrc}
+              src={activeTab === TABS.REMOVE_BG && removedBgImage ? removedBgImage : imageSrc}
               alt="Edit"
               onLoad={onImageLoad}
               className="max-w-full"

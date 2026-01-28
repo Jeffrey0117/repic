@@ -344,5 +344,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Listen for prefetch stream events
     onPrefetchReady: (callback) => {
         ipcRenderer.on('prefetch-ready', (_event, data) => callback(data));
+    },
+
+    // Remove background from image
+    removeBackground: async (imageSrc) => {
+        if (!imageSrc || typeof imageSrc !== 'string') {
+            return { success: false, error: 'Invalid image source' };
+        }
+        return await ipcRenderer.invoke('remove-background', { imageSrc });
     }
 });

@@ -6,6 +6,7 @@ const os = require('os');
 const https = require('https');
 const http = require('http');
 const crypto = require('crypto');
+const sharp = require('sharp');
 
 // Temp directory for drag & drop
 const TEMP_DIR = path.join(os.tmpdir(), 'repic-temp');
@@ -686,6 +687,81 @@ function setupIpcHandlers() {
         } catch (e) {
             console.error('Failed to write .repic files:', e);
             return { success: false, error: e.message };
+        }
+    });
+
+    // Remove background from image
+    ipcMain.handle('remove-background', async (event, { imageSrc }) => {
+        try {
+            let inputBuffer;
+
+            // Convert imageSrc to buffer
+            if (imageSrc.startsWith('data:')) {
+                // Base64 data URL
+                const base64Content = imageSrc.split(',')[1];
+                inputBuffer = Buffer.from(base64Content, 'base64');
+            } else if (imageSrc.startsWith('file://')) {
+                // Local file
+                const filePath = imageSrc.replace('file://', '').split('?')[0];
+                inputBuffer = fs.readFileSync(filePath);
+            } else if (imageSrc.startsWith('http')) {
+                // Download web image first
+                const tempPath = await downloadToTemp(imageSrc);
+                inputBuffer = fs.readFileSync(tempPath);
+            } else {
+                return { success: false, error: 'Unsupported image source' };
+            }
+
+            // Load image with sharp
+            const image = sharp(inputBuffer);
+            const metadata = await image.metadata();
+
+            // Get raw pixel data
+            const { data, info } = await image
+                .ensureAlpha()
+                .raw()
+                .toBuffer({ resolveWithObject: true });
+
+            // Process pixels to remove light gray/white background
+            // Using brightness + saturation algorithm
+            for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+
+                // Check if pixel is light (brightness > 200)
+                const brightness = (r + g + b) / 3;
+
+                // Check if pixel is grayscale (low color variation)
+                const maxChannel = Math.max(r, g, b);
+                const minChannel = Math.min(r, g, b);
+                const saturation = maxChannel - minChannel;
+
+                // Remove if: bright AND low saturation (gray/white)
+                if (brightness > 200 && saturation < 30) {
+                    data[i + 3] = 0; // Set alpha to 0 (transparent)
+                }
+            }
+
+            // Create new PNG with transparency
+            const outputBuffer = await sharp(data, {
+                raw: {
+                    width: info.width,
+                    height: info.height,
+                    channels: 4
+                }
+            })
+            .png()
+            .toBuffer();
+
+            // Convert to base64 data URL
+            const base64 = outputBuffer.toString('base64');
+            const dataUrl = `data:image/png;base64,${base64}`;
+
+            return { success: true, data: dataUrl };
+        } catch (error) {
+            console.error('Background removal error:', error);
+            return { success: false, error: error.message };
         }
     });
 
