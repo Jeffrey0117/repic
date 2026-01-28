@@ -387,8 +387,8 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
                 </div>
             ) : (
                 (() => {
-                    // Show checkerboard if: 1) detected transparency, or 2) PNG format (optimistic)
-                    const shouldShowCheckerboard = detectedTransparency || isPNGFormat(imageSrc);
+                    // Show checkerboard ONLY if transparency is actually detected
+                    const shouldShowCheckerboard = detectedTransparency;
 
                     return (
                         <div

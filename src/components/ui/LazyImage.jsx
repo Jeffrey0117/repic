@@ -282,7 +282,7 @@ export const LazyImage = memo(({
     useEffect(() => {
         if (!loadedSrc || hasError) return;
 
-        // Only detect for PNG format images to save performance
+        // Always detect transparency for PNG to avoid false positives
         if (isPNGFormat(loadedSrc)) {
             hasImageTransparency(loadedSrc).then((hasAlpha) => {
                 setDetectedTransparency(hasAlpha);
@@ -300,8 +300,8 @@ export const LazyImage = memo(({
         );
     }
 
-    // Show checkerboard if: 1) explicitly marked, 2) detected transparency, or 3) PNG format (optimistic)
-    const shouldShowCheckerboard = hasTransparency || detectedTransparency || isPNGFormat(src);
+    // Show checkerboard ONLY if: 1) explicitly marked, or 2) actually detected transparency
+    const shouldShowCheckerboard = hasTransparency || detectedTransparency;
 
     return (
         <div
