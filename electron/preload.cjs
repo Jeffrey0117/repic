@@ -225,6 +225,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return await ipcRenderer.invoke('start-drag', { imageSrc, fileName });
     },
 
+    // Pre-warm drag file cache (fire-and-forget, downloads HTTP URL to temp)
+    prepareDragFile: (url) => {
+        if (!url || typeof url !== 'string' || !url.startsWith('http')) return;
+        ipcRenderer.send('prepare-drag-file', url);
+    },
+
     // Proxy image download - bypass browser restrictions (for hotlink protected images)
     proxyImage: async (url) => {
         if (!url || typeof url !== 'string' || !url.startsWith('http')) {

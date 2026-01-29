@@ -813,6 +813,15 @@ function setupIpcHandlers() {
         }
     });
 
+    // Pre-warm drag file cache (fire-and-forget)
+    // Downloads HTTP URL to temp so subsequent start-drag is instant
+    ipcMain.on('prepare-drag-file', (event, url) => {
+        if (!url || !url.startsWith('http')) return;
+        downloadToTemp(url).catch(err => {
+            console.log('[prepare-drag-file] Pre-warm failed:', err.message);
+        });
+    });
+
     // Proxy image download - bypass browser restrictions
     ipcMain.handle('proxy-image', async (event, url) => {
         console.log('[proxy-image] Requested:', url);

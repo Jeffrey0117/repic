@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import useI18n from '../../hooks/useI18n';
-import { getCached, loadImage, PRIORITY_HIGH } from '../../utils/imageLoader';
+import { getCached, loadImage, cacheProxyResult, PRIORITY_HIGH, PRIORITY_LOW } from '../../utils/imageLoader';
 import { getLocalUrl, onPrefetchComplete } from '../../utils/prefetchManager';
 import { drawAnnotation } from '../editor/utils/drawingHelpers';
 import { hasImageTransparency, isPNGFormat } from '../../utils/imageUtils';
@@ -80,50 +80,17 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
                     try {
                         const result = await electronAPI.readRepicFile(src);
                         if (result.success && result.data?.url) {
-                            // Use the URL from .repic file
                             const actualSrc = result.data.url;
-
-                            // Check cache first
-                            const cached = getCached(actualSrc);
-                            if (cached) {
-                                setProxiedSrc(cached);
+                            // Fast path: use URL directly for instant display
+                            if (actualSrc.startsWith('http')) {
+                                setProxiedSrc(actualSrc);
                                 setIsLoading(false);
-                                return;
+                                // Background cache for offline/drag
+                                loadImage(actualSrc, PRIORITY_LOW).catch(() => {});
+                            } else {
+                                setProxiedSrc(actualSrc);
+                                setIsLoading(false);
                             }
-
-                            // Load the actual URL
-                            loadImage(actualSrc, PRIORITY_HIGH)
-                                .then((data) => {
-                                    setProxiedSrc(data);
-                                    setIsLoading(false);
-                                })
-                                .catch(async (err) => {
-                                    // Try fallback proxies
-                                    if (electronAPI?.proxyImage) {
-                                        try {
-                                            const proxyResult = await electronAPI.proxyImage(actualSrc);
-                                            if (proxyResult.success) {
-                                                setProxiedSrc(proxyResult.data);
-                                                setIsLoading(false);
-                                                return;
-                                            }
-                                        } catch (e) {}
-                                    }
-
-                                    if (electronAPI?.proxyImageBrowser) {
-                                        try {
-                                            const browserResult = await electronAPI.proxyImageBrowser(actualSrc);
-                                            if (browserResult.success) {
-                                                setProxiedSrc(browserResult.data);
-                                                setIsLoading(false);
-                                                return;
-                                            }
-                                        } catch (e) {}
-                                    }
-
-                                    setIsLoading(false);
-                                    setLoadFailed(true);
-                                });
                         } else {
                             setIsLoading(false);
                             setLoadFailed(true);
@@ -149,13 +116,12 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
         // Check if Go prefetched this image to local temp
         const localUrl = getLocalUrl(src);
         if (localUrl) {
-            console.log('[ImageViewer] Using prefetched:', localUrl);
             setProxiedSrc(localUrl);
             setIsLoading(false);
             return;
         }
 
-        // Web images: check JS cache
+        // Check JS memory cache
         const cached = getCached(src);
         if (cached) {
             setProxiedSrc(cached);
@@ -163,71 +129,24 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
             return;
         }
 
-        // Not prefetched yet - show loading and wait for prefetch or load via JS
-        setIsLoading(true);
-        let cancelled = false;
-
-        // Listen for prefetch completion
-        const unsubscribe = onPrefetchComplete(src, (localPath) => {
-            if (cancelled) return;
-            const fileUrl = `file:///${localPath.replace(/\\/g, '/')}`;
-            console.log('[ImageViewer] Prefetch complete:', fileUrl);
-            setProxiedSrc(fileUrl);
-            setIsLoading(false);
-        });
-
-        // Also load via JS imageLoader as fallback
-        loadImage(src, PRIORITY_HIGH)
-            .then((data) => {
-                if (cancelled) return;
-                setProxiedSrc(data);
-                setIsLoading(false);
-            })
-            .catch(async (err) => {
-                if (cancelled) return;
-                // Don't retry if aborted
-                if (err?.name === 'AbortError') {
-                    setIsLoading(false);
-                    return;
-                }
-                // Layer 2: Try Node.js proxy
-                if (electronAPI?.proxyImage) {
-                    try {
-                        const result = await electronAPI.proxyImage(src);
-                        if (!cancelled && result.success) {
-                            setProxiedSrc(result.data);
-                            setIsLoading(false);
-                            return;
-                        }
-                    } catch (e) {
-                        // Continue to browser proxy
-                    }
-                }
-
-                // Layer 3: Try browser proxy (for strict sites like postimg)
-                if (!cancelled && electronAPI?.proxyImageBrowser) {
-                    try {
-                        const result = await electronAPI.proxyImageBrowser(src);
-                        if (!cancelled && result.success) {
-                            setProxiedSrc(result.data);
-                            setIsLoading(false);
-                            return;
-                        }
-                    } catch (e) {
-                        // All methods failed
-                    }
-                }
-
-                if (!cancelled) {
-                    setIsLoading(false);
-                    setLoadFailed(true);
-                }
+        // FAST PATH: For HTTP URLs, show directly via native <img src>
+        // Browser can load cross-origin images natively (no CORS on <img>)
+        if (src.startsWith('http')) {
+            setIsLoading(false); // No spinner - browser loads natively
+            // Pre-warm drag file in main process
+            electronAPI?.prepareDragFile?.(src);
+            // Background: cache base64 for offline/drag (don't update display)
+            loadImage(src, PRIORITY_LOW).catch(() => {});
+            // Listen for Go prefetch completion (even faster local file)
+            const unsubscribe = onPrefetchComplete(src, (localPath) => {
+                const fileUrl = `file:///${localPath.replace(/\\/g, '/')}`;
+                setProxiedSrc(fileUrl);
             });
+            return () => unsubscribe();
+        }
 
-        return () => {
-            cancelled = true;
-            unsubscribe();
-        };
+        // Fallback for other protocols
+        setIsLoading(false);
     }, [src]);
 
     // Actual image source (cached > proxied > original)
@@ -358,10 +277,15 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
             return;
         }
         e.preventDefault();
-        // Use Electron's native drag for system-level drag
-        // Prefer cached/proxied version (no re-download) over original URL
         if (electronAPI?.startDrag && src) {
-            electronAPI.startDrag(imageSrc || src);
+            // Prefer fastest source for drag:
+            // 1. Go-prefetched local file (instant)
+            // 2. Cached base64 (fast writeFileSync in main)
+            // 3. Proxied/cached src
+            // 4. Original URL (slowest - needs download)
+            const localUrl = src.startsWith('http') ? getLocalUrl(src) : null;
+            const cached = src.startsWith('http') ? getCached(src) : null;
+            electronAPI.startDrag(localUrl || cached || imageSrc || src);
         }
     }, [src, imageSrc]);
 
@@ -452,12 +376,40 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
                             setImageSize({ width: e.target.clientWidth, height: e.target.clientHeight });
                         }}
                         onError={async () => {
-                            // If failed and haven't tried proxy yet
-                            if (src?.startsWith('http') && !proxiedSrc && electronAPI?.proxyImage) {
-                                const result = await electronAPI.proxyImage(src);
-                                if (result.success) {
-                                    setProxiedSrc(result.data);
-                                    return;
+                            // For HTTP URLs displayed natively, try proxy fallback chain
+                            const urlToProxy = src?.startsWith('http') ? src : null;
+                            if (urlToProxy && !proxiedSrc) {
+                                // Layer 1: Try JS imageLoader (fetch with CORS)
+                                try {
+                                    const data = await loadImage(urlToProxy, PRIORITY_HIGH);
+                                    if (data) {
+                                        setProxiedSrc(data);
+                                        return;
+                                    }
+                                } catch (e) {
+                                    if (e?.name === 'AbortError') { setIsLoading(false); return; }
+                                }
+                                // Layer 2: Node.js proxy
+                                if (electronAPI?.proxyImage) {
+                                    try {
+                                        const result = await electronAPI.proxyImage(urlToProxy);
+                                        if (result.success) {
+                                            cacheProxyResult(urlToProxy, result.data);
+                                            setProxiedSrc(result.data);
+                                            return;
+                                        }
+                                    } catch (e) {}
+                                }
+                                // Layer 3: Browser proxy
+                                if (electronAPI?.proxyImageBrowser) {
+                                    try {
+                                        const result = await electronAPI.proxyImageBrowser(urlToProxy);
+                                        if (result.success) {
+                                            cacheProxyResult(urlToProxy, result.data);
+                                            setProxiedSrc(result.data);
+                                            return;
+                                        }
+                                    } catch (e) {}
                                 }
                             }
                             setIsLoading(false);

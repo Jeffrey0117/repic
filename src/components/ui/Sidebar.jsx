@@ -2,6 +2,7 @@ import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } fr
 import { getThumbnail, saveThumbnail, generateThumbnail } from '../../utils/thumbnailCache';
 import { getCachedImage, cacheImage } from '../../utils/offlineCache';
 import { preloadImages, preloadThumbnails, getCached } from '../../utils/imageLoader';
+import { getLocalUrl } from '../../utils/prefetchManager';
 import { LazyImage } from './LazyImage';
 import { hasImageTransparency, isPNGFormat } from '../../utils/imageUtils';
 
@@ -655,11 +656,14 @@ export const Sidebar = ({
                                 onDragStart={(e) => {
                                     if (!canReorder) {
                                         e.preventDefault();
-                                        // Use Electron's native drag for system-level drag
-                                        // Prefer cached base64 (no re-download needed) over HTTP URL
                                         if (electronAPI?.startDrag) {
+                                            // Prefer fastest source for drag:
+                                            // 1. Go-prefetched local file (instant)
+                                            // 2. Cached base64 (fast writeFileSync)
+                                            // 3. Original src (may be slow for HTTP)
+                                            const localUrl = isWeb ? getLocalUrl(originalUrl) : null;
                                             const cached = isWeb ? getCached(imgSrc) : null;
-                                            electronAPI.startDrag(cached || imgSrc, fileName);
+                                            electronAPI.startDrag(localUrl || cached || imgSrc, fileName);
                                         }
                                     }
                                 }}

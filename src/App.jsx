@@ -1240,9 +1240,15 @@ function App() {
     }
   }, [viewMode, selectedAlbum?.images, albumImageIndex]);
 
-  // Fallback: also preload via JS imageLoader for immediate display
+  // Pre-warm drag cache for current album image (Go downloads to temp)
   useEffect(() => {
     if (viewMode !== 'album' || !currentAlbumImage) return;
+    const electronAPI = getElectronAPI();
+    // Pre-download to temp file for instant drag
+    if (currentAlbumImage.startsWith('http')) {
+      electronAPI?.prepareDragFile?.(currentAlbumImage);
+    }
+    // Also cache base64 for offline/drag via JS pipeline
     loadImage(currentAlbumImage, PRIORITY_HIGH).catch(() => {});
   }, [viewMode, currentAlbumImage]);
 
