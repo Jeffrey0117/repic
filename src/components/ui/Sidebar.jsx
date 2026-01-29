@@ -656,8 +656,10 @@ export const Sidebar = ({
                                     if (!canReorder) {
                                         e.preventDefault();
                                         // Use Electron's native drag for system-level drag
+                                        // Prefer cached base64 (no re-download needed) over HTTP URL
                                         if (electronAPI?.startDrag) {
-                                            electronAPI.startDrag(imgSrc, fileName);
+                                            const cached = isWeb ? getCached(imgSrc) : null;
+                                            electronAPI.startDrag(cached || imgSrc, fileName);
                                         }
                                     }
                                 }}

@@ -1,14 +1,19 @@
-import { useState, useEffect, useRef, memo } from 'react';
-import { loadImage, loadThumbnail, getCached, getCachedThumbnail, cacheProxyResult, PRIORITY_HIGH, PRIORITY_NORMAL, PRIORITY_LOW } from '../../utils/imageLoader';
+import { useState, useEffect, useRef, useCallback, memo } from 'react';
+import { loadImage, getCached, getCachedThumbnail, cacheProxyResult, PRIORITY_HIGH, PRIORITY_NORMAL, PRIORITY_LOW } from '../../utils/imageLoader';
 import { hasImageTransparency, isPNGFormat } from '../../utils/imageUtils';
 
 const electronAPI = window.electronAPI || null;
 
 /**
- * LazyImage - Only loads when visible in viewport
- * Uses imageLoader for optimized concurrent loading
+ * LazyImage - Optimized image loading with fast path for HTTP URLs
  *
- * useThumbnail: Use 256x256 JPEG thumbnail for faster loading (sidebar)
+ * Strategy:
+ * 1. Check memory/IndexedDB cache → instant display
+ * 2. HTTP URLs → show <img src={url}> directly (browser native, no CORS issues)
+ * 3. If native load fails → proxy fallback chain
+ * 4. Background: cache base64 for offline support
+ *
+ * useThumbnail: prefer cached thumbnail for sidebar display
  */
 export const LazyImage = memo(({
     src,
@@ -16,273 +21,175 @@ export const LazyImage = memo(({
     className = '',
     style,
     isHighPriority = false,
-    useThumbnail = false, // Use cached thumbnail instead of full image
+    useThumbnail = false,
     onLoad,
     onError,
     fallbackElement,
     showSpinner = true,
-    hasTransparency = false // Only show checkerboard if image has transparency
+    hasTransparency = false
 }) => {
     const imgRef = useRef(null);
 
-    // Initialize from cache immediately
+    // Initialize from cache, or use HTTP URL directly (fast path)
     const [loadedSrc, setLoadedSrc] = useState(() => {
+        // Check cache first (instant, base64)
         if (useThumbnail) {
-            return getCachedThumbnail(src) || getCached(src);
+            const cached = getCachedThumbnail(src) || getCached(src);
+            if (cached) return cached;
+        } else {
+            const cached = getCached(src);
+            if (cached) return cached;
         }
-        return getCached(src);
+        // Fast path: HTTP URLs render immediately via native <img>
+        if (src?.startsWith('http')) return src;
+        // Local files
+        if (src?.startsWith('file://') || src?.startsWith('data:')) return src;
+        return null;
     });
     const [isLoading, setIsLoading] = useState(!loadedSrc);
     const [hasError, setHasError] = useState(false);
-    const [isVisible, setIsVisible] = useState(false);
     const [detectedTransparency, setDetectedTransparency] = useState(false);
 
-    // Intersection Observer for visibility detection
-    useEffect(() => {
-        const img = imgRef.current;
-        if (!img) return;
-
-        const observer = new IntersectionObserver(
-            (entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        setIsVisible(true);
-                        observer.unobserve(entry.target);
-                    }
-                });
-            },
-            {
-                rootMargin: '100px', // Start loading slightly before visible
-                threshold: 0
-            }
-        );
-
-        observer.observe(img);
-
-        return () => observer.disconnect();
-    }, []);
-
-    // Load image when visible
-    // Strategy: fetch() -> Node proxy -> browser proxy (page-level)
-    useEffect(() => {
-        if (!isVisible || !src) return;
-        if (loadedSrc) return; // Already loaded
-
-        // Check if it's a .repic virtual image file
-        if (src.toLowerCase().endsWith('.repic')) {
-            if (electronAPI?.readRepicFile) {
-                (async () => {
-                    try {
-                        const result = await electronAPI.readRepicFile(src);
-                        if (result.success && result.data?.url) {
-                            // Replace src with the URL from .repic file
-                            // This will trigger a new load cycle with the actual URL
-                            setLoadedSrc(null);
-                            setIsLoading(true);
-                            // Directly load the URL from .repic file
-                            const actualSrc = result.data.url;
-
-                            // Load the actual URL using the same strategy
-                            const priority = isHighPriority ? PRIORITY_HIGH : PRIORITY_NORMAL;
-                            const loader = useThumbnail ? loadThumbnail(actualSrc) : loadImage(actualSrc, priority);
-
-                            loader
-                                .then((data) => {
-                                    if (data) {
-                                        setLoadedSrc(data);
-                                        setIsLoading(false);
-                                        onLoad?.();
-                                    }
-                                })
-                                .catch(async (err) => {
-                                    // Try fallback proxies for web images
-                                    if (electronAPI?.proxyImage) {
-                                        try {
-                                            const proxyResult = await electronAPI.proxyImage(actualSrc);
-                                            if (proxyResult.success) {
-                                                cacheProxyResult(actualSrc, proxyResult.data);
-                                                setLoadedSrc(proxyResult.data);
-                                                setIsLoading(false);
-                                                onLoad?.();
-                                                return;
-                                            }
-                                        } catch (e) {}
-                                    }
-
-                                    // Try browser proxy as last resort
-                                    if (electronAPI?.proxyImageBrowser) {
-                                        try {
-                                            const browserResult = await electronAPI.proxyImageBrowser(actualSrc);
-                                            if (browserResult.success) {
-                                                cacheProxyResult(actualSrc, browserResult.data);
-                                                setLoadedSrc(browserResult.data);
-                                                setIsLoading(false);
-                                                onLoad?.();
-                                                return;
-                                            }
-                                        } catch (e) {}
-                                    }
-
-                                    setHasError(true);
-                                    setIsLoading(false);
-                                    onError?.(err);
-                                });
-                        } else {
-                            setHasError(true);
-                            setIsLoading(false);
-                        }
-                    } catch (err) {
-                        setHasError(true);
-                        setIsLoading(false);
-                        onError?.(err);
-                    }
-                })();
-            } else {
-                setHasError(true);
-                setIsLoading(false);
-            }
-            return;
-        }
-
-        // Check if it's a local file (no need for imageLoader)
-        if (src.startsWith('file://') || src.startsWith('data:')) {
-            setLoadedSrc(src);
-            setIsLoading(false);
-            return;
-        }
-
-        // Only load web images
-        if (!src.startsWith('http')) {
+    // Handle native <img> load failure → proxy fallback chain
+    const handleImgError = useCallback(async () => {
+        // Only trigger proxy for HTTP URLs loaded natively
+        if (!loadedSrc?.startsWith('http')) {
             setHasError(true);
             setIsLoading(false);
+            onError?.();
             return;
         }
 
-        setIsLoading(true);
-        setHasError(false);
-        let cancelled = false;
-
-        const priority = isHighPriority ? PRIORITY_HIGH : PRIORITY_NORMAL;
-
-        // Use thumbnail loader for sidebar (faster, smaller)
-        const loader = useThumbnail ? loadThumbnail(src) : loadImage(src, priority);
-
-        // Timeout: if image doesn't load in 5s, try proxy
-        const timeoutId = setTimeout(async () => {
-            if (cancelled || loadedSrc) return;
-            console.log('[LazyImage] Timeout, trying proxy:', src);
-            if (electronAPI?.proxyImage) {
-                try {
-                    const result = await electronAPI.proxyImage(src);
-                    if (!cancelled && result.success) {
-                        cacheProxyResult(src, result.data);
-                        setLoadedSrc(result.data);
-                        setIsLoading(false);
-                        onLoad?.();
-                    }
-                } catch (e) {}
+        // Layer 1: Try imageLoader (fetch with CORS)
+        try {
+            const priority = isHighPriority ? PRIORITY_HIGH : PRIORITY_NORMAL;
+            const data = await loadImage(src, priority);
+            if (data) {
+                setLoadedSrc(data);
+                onLoad?.();
+                return;
             }
-        }, 5000);
+        } catch (e) {
+            if (e?.name === 'AbortError') {
+                setIsLoading(false);
+                return;
+            }
+        }
 
-        loader
-            .then((data) => {
-                clearTimeout(timeoutId);
-                if (cancelled) return;
-                if (data) {
-                    setLoadedSrc(data);
-                    setIsLoading(false);
+        // Layer 2: Node.js proxy
+        if (electronAPI?.proxyImage) {
+            try {
+                const result = await electronAPI.proxyImage(src);
+                if (result.success) {
+                    cacheProxyResult(src, result.data);
+                    setLoadedSrc(result.data);
                     onLoad?.();
-                } else {
-                    throw new Error('No data');
-                }
-            })
-            .catch(async (err) => {
-                clearTimeout(timeoutId);
-                if (cancelled) return;
-                // Don't retry if request was intentionally aborted (album switch)
-                if (err?.name === 'AbortError') {
-                    setIsLoading(false);
                     return;
                 }
+            } catch (e) {}
+        }
 
-                // Layer 2: Try Node.js proxy (handles most CORS)
-                console.log('[LazyImage] Load failed, trying proxy:', src);
-                if (electronAPI?.proxyImage) {
-                    try {
-                        const result = await electronAPI.proxyImage(src);
-                        if (!cancelled && result.success) {
-                            cacheProxyResult(src, result.data);
-                            setLoadedSrc(result.data);
-                            setIsLoading(false);
-                            onLoad?.();
-                            return;
-                        }
-                    } catch (e) {
-                        // Continue to browser proxy
-                    }
+        // Layer 3: Browser proxy (for strict sites)
+        if (electronAPI?.proxyImageBrowser) {
+            try {
+                const result = await electronAPI.proxyImageBrowser(src);
+                if (result.success) {
+                    cacheProxyResult(src, result.data);
+                    setLoadedSrc(result.data);
+                    onLoad?.();
+                    return;
                 }
+            } catch (e) {}
+        }
 
-                // Layer 3: Try browser proxy (hidden window, loads host page)
-                // For strict sites like postimg that block all direct requests
-                console.log('[LazyImage] Node proxy failed, trying browser proxy:', src);
-                if (!cancelled && electronAPI?.proxyImageBrowser) {
-                    try {
-                        const result = await electronAPI.proxyImageBrowser(src);
-                        if (!cancelled && result.success) {
-                            cacheProxyResult(src, result.data);
-                            setLoadedSrc(result.data);
-                            setIsLoading(false);
-                            onLoad?.();
-                            return;
-                        }
-                    } catch (e) {
-                        // All methods failed
-                    }
-                }
+        setHasError(true);
+        setIsLoading(false);
+        onError?.();
+    }, [loadedSrc, src, isHighPriority, onLoad, onError]);
 
-                if (!cancelled) {
-                    setHasError(true);
-                    setIsLoading(false);
-                    onError?.(err);
-                }
-            });
-
-        return () => {
-            cancelled = true;
-            clearTimeout(timeoutId);
-        };
-    }, [isVisible, src, loadedSrc, isHighPriority, useThumbnail, onLoad, onError]);
-
-    // Reset when src changes - check cache first
+    // Reset when src changes
     useEffect(() => {
-        // Check thumbnail cache first if using thumbnails
         const cached = useThumbnail
             ? (getCachedThumbnail(src) || getCached(src))
             : getCached(src);
 
         if (cached) {
-            // Single batch update
             setLoadedSrc(cached);
             setIsLoading(false);
             setHasError(false);
-        } else if (src?.startsWith('http') || src?.toLowerCase().endsWith('.repic')) {
-            // Reset if it's a web image or .repic file that needs loading
+        } else if (src?.startsWith('http')) {
+            // Fast path: use HTTP URL directly
+            setLoadedSrc(src);
+            setIsLoading(false);
+            setHasError(false);
+        } else if (src?.toLowerCase().endsWith('.repic')) {
             setLoadedSrc(null);
             setIsLoading(true);
             setHasError(false);
-        } else {
-            // Local files don't need loading state
+        } else if (src) {
             setLoadedSrc(src);
+            setIsLoading(false);
+            setHasError(false);
+        } else {
+            setLoadedSrc(null);
             setIsLoading(false);
             setHasError(false);
         }
     }, [src, useThumbnail]);
 
-    // Detect transparency when image loads
+    // Background caching: for HTTP URLs displayed natively, cache base64 for offline
+    useEffect(() => {
+        if (!src?.startsWith('http')) return;
+        // Skip if already cached as base64
+        if (getCached(src) || getCachedThumbnail(src)) return;
+
+        // Cache in background at low priority (don't block display)
+        loadImage(src, PRIORITY_LOW).catch(() => {});
+    }, [src]);
+
+    // Handle .repic virtual image files
+    useEffect(() => {
+        if (!src?.toLowerCase().endsWith('.repic')) return;
+        if (!electronAPI?.readRepicFile) {
+            setHasError(true);
+            setIsLoading(false);
+            return;
+        }
+
+        let cancelled = false;
+        (async () => {
+            try {
+                const result = await electronAPI.readRepicFile(src);
+                if (cancelled) return;
+                if (result.success && result.data?.url) {
+                    const actualSrc = result.data.url;
+                    // Fast path: use URL directly
+                    setLoadedSrc(actualSrc);
+                    setIsLoading(false);
+                } else {
+                    setHasError(true);
+                    setIsLoading(false);
+                }
+            } catch (err) {
+                if (!cancelled) {
+                    setHasError(true);
+                    setIsLoading(false);
+                    onError?.(err);
+                }
+            }
+        })();
+
+        return () => { cancelled = true; };
+    }, [src, onError]);
+
+    // Detect transparency when image loads (only for base64/data URLs, not HTTP)
     useEffect(() => {
         if (!loadedSrc || hasError) return;
-
-        // Always detect transparency for PNG to avoid false positives
+        // Skip transparency detection for HTTP URLs (can't read cross-origin canvas)
+        if (loadedSrc.startsWith('http')) {
+            setDetectedTransparency(false);
+            return;
+        }
         if (isPNGFormat(loadedSrc)) {
             hasImageTransparency(loadedSrc).then((hasAlpha) => {
                 setDetectedTransparency(hasAlpha);
@@ -300,7 +207,6 @@ export const LazyImage = memo(({
         );
     }
 
-    // Show checkerboard ONLY if: 1) explicitly marked, or 2) actually detected transparency
     const shouldShowCheckerboard = hasTransparency || detectedTransparency;
 
     return (
@@ -309,7 +215,6 @@ export const LazyImage = memo(({
             className={`relative ${className}`}
             style={{
                 ...style,
-                // Only show checkerboard for images with actual transparency
                 ...(shouldShowCheckerboard ? {
                     backgroundImage: `
                         linear-gradient(45deg, #CCCCCC 25%, transparent 25%),
@@ -323,19 +228,15 @@ export const LazyImage = memo(({
                 } : {})
             }}
         >
-            {/* Loading state: spinner for full images, subtle bg for thumbnails */}
             {isLoading && (
                 useThumbnail ? (
-                    // Thumbnails: just a subtle shimmer background, no spinner
                     <div className="absolute inset-0 bg-white/5 animate-pulse" />
                 ) : showSpinner ? (
-                    // Full images: show spinner
                     <div className="absolute inset-0 flex items-center justify-center bg-black/20">
                         <div className="w-4 h-4 border-2 border-white/30 border-t-white/80 rounded-full animate-spin" />
                     </div>
                 ) : null
             )}
-            {/* Image */}
             {loadedSrc && (
                 <img
                     src={loadedSrc}
@@ -344,6 +245,11 @@ export const LazyImage = memo(({
                     style={style}
                     draggable={false}
                     referrerPolicy="no-referrer"
+                    onLoad={() => {
+                        setIsLoading(false);
+                        onLoad?.();
+                    }}
+                    onError={handleImgError}
                 />
             )}
         </div>

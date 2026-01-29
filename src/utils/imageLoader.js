@@ -10,7 +10,7 @@
 import { getCachedImage, cacheImage } from './offlineCache';
 
 // Configuration
-const MAX_CONCURRENT = 4; // Max simultaneous downloads
+const MAX_CONCURRENT = 6; // Max simultaneous downloads
 const PRIORITY_HIGH = 0;
 const PRIORITY_NORMAL = 1;
 const PRIORITY_LOW = 2;
@@ -338,24 +338,34 @@ export const getCachedThumbnail = (url) => {
 
 /**
  * Preload thumbnails for URLs (for sidebar)
+ * Parallel batch processing for fast cache checking
  */
 export const preloadThumbnails = async (urls) => {
-  for (const url of urls) {
-    if (!url || thumbCache.has(url)) continue;
+  // Filter out already-cached URLs
+  const uncached = urls.filter(url => url && !thumbCache.has(url));
+  if (uncached.length === 0) return;
 
-    // Check IndexedDB first
-    try {
-      const cached = await getCachedImage(THUMB_PREFIX + url);
-      if (cached) {
-        thumbCache.set(url, cached);
-        continue;
+  // Check IndexedDB in parallel batches (much faster than sequential)
+  const BATCH_SIZE = 8;
+  for (let i = 0; i < uncached.length; i += BATCH_SIZE) {
+    const batch = uncached.slice(i, i + BATCH_SIZE);
+    const results = await Promise.allSettled(
+      batch.map(async (url) => {
+        const cached = await getCachedImage(THUMB_PREFIX + url);
+        if (cached) {
+          thumbCache.set(url, cached);
+          return { url, cached: true };
+        }
+        return { url, cached: false };
+      })
+    );
+
+    // Queue uncached URLs for background loading
+    for (const result of results) {
+      if (result.status === 'fulfilled' && !result.value.cached) {
+        loadImage(result.value.url, PRIORITY_LOW).catch(() => {});
       }
-    } catch (e) {
-      // Ignore
     }
-
-    // Queue for loading (low priority)
-    loadImage(url, PRIORITY_LOW).catch(() => {});
   }
 };
 

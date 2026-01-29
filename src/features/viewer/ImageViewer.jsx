@@ -359,10 +359,11 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
         }
         e.preventDefault();
         // Use Electron's native drag for system-level drag
+        // Prefer cached/proxied version (no re-download) over original URL
         if (electronAPI?.startDrag && src) {
-            electronAPI.startDrag(src);
+            electronAPI.startDrag(imageSrc || src);
         }
-    }, [src]);
+    }, [src, imageSrc]);
 
     return (
         <div
