@@ -129,6 +129,23 @@ const FolderOutput = ({ size = 24, className = '' }) => (
     </svg>
 );
 
+const LayoutGrid = ({ size = 24, className = '' }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <rect x="3" y="3" width="7" height="7" rx="1" />
+        <rect x="14" y="3" width="7" height="7" rx="1" />
+        <rect x="3" y="14" width="7" height="7" rx="1" />
+        <rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+);
+
+const ImageIcon = ({ size = 24, className = '' }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <circle cx="9" cy="9" r="2" />
+        <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+    </svg>
+);
+
 const Trash2 = ({ size = 24, className = '' }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
         <path d="M3 6h18" />
@@ -416,6 +433,18 @@ export const TopBar = ({
                     badge={isMultiSelectMode ? selectedImageIds?.size || 0 : 0}
                     theme={theme}
                 />
+
+                {onToggleViewLayout && (
+                    <>
+                        <div className={`w-px h-5 mx-1 ${theme === 'dark' ? 'bg-white/10' : 'bg-black/10'}`} />
+                        <ToolbarButton
+                            icon={currentViewMode === 'grid' ? ImageIcon : LayoutGrid}
+                            title={currentViewMode === 'grid' ? t('switchToImageView') || '切換到圖片檢視' : t('switchToGridView') || '切換到網格檢視'}
+                            onClick={onToggleViewLayout}
+                            theme={theme}
+                        />
+                    </>
+                )}
             </div>
 
             {/* Right: Actions */}
@@ -448,31 +477,6 @@ export const TopBar = ({
                 >
                     {sidebarPosition === 'left' ? <PanelBottom size={18} /> : <PanelLeft size={18} />}
                 </Button>
-
-                {/* Grid/Image view toggle */}
-                {onToggleViewLayout && (
-                    <Button
-                        variant="ghost"
-                        className={`h-9 w-9 p-0 rounded-lg hover:bg-black/10 dark:hover:bg-white/5 ${theme === 'dark' ? 'text-white/70' : 'text-gray-600'}`}
-                        onClick={onToggleViewLayout}
-                        title={currentViewMode === 'grid' ? '切換到圖片檢視' : '切換到網格檢視'}
-                    >
-                        {currentViewMode === 'grid' ? (
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <rect x="3" y="3" width="18" height="18" rx="2" />
-                                <circle cx="9" cy="9" r="2" />
-                                <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-                            </svg>
-                        ) : (
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <rect x="3" y="3" width="7" height="7" />
-                                <rect x="14" y="3" width="7" height="7" />
-                                <rect x="3" y="14" width="7" height="7" />
-                                <rect x="14" y="14" width="7" height="7" />
-                            </svg>
-                        )}
-                    </Button>
-                )}
 
                 <div className={`w-px h-6 mx-1 ${theme === 'dark' ? 'bg-white/10' : 'bg-black/10'}`} />
 

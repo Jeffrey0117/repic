@@ -246,8 +246,7 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
         e.preventDefault();
 
         const container = containerRef.current;
-        const image = imageRef.current;
-        if (!container || !image) return;
+        if (!container) return;
 
         const rect = container.getBoundingClientRect();
 
@@ -375,7 +374,7 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
 
             {/* Loading spinner */}
             {isLoading && !loadFailed && (
-                <div className="absolute inset-0 flex items-center justify-center">
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <div className="w-8 h-8 border-3 border-white/20 border-t-white/80 rounded-full animate-spin" />
                 </div>
             )}

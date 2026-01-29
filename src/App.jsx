@@ -112,6 +112,21 @@ function App() {
     return localStorage.getItem('repic-local-view-mode') || 'grid';
   });
 
+  // Unique counter for local viewport transitions (prevents duplicate keys in AnimatePresence)
+  const [localViewInstance, setLocalViewInstance] = useState(0);
+  useEffect(() => {
+    setLocalViewInstance(prev => prev + 1);
+  }, [viewMode, localViewMode, localImage]);
+
+  const localViewerKey = useMemo(
+    () => `viewer-${localViewInstance}-${localImage ?? 'empty'}`,
+    [localViewInstance, localImage]
+  );
+  const dropzoneKey = useMemo(
+    () => `dropzone-${localViewInstance}-${localViewMode}`,
+    [localViewInstance, localViewMode]
+  );
+
   // Album sidebar collapsed state
   const [albumSidebarCollapsed, setAlbumSidebarCollapsed] = useState(false);
 
@@ -1762,15 +1777,19 @@ function App() {
           localStorage.setItem('repic-sidebar-position', newPos);
         }}
         onAbout={() => setShowAboutDialog(true)}
-        // Grid/Image view toggle
+        // Grid/Image view toggle - only show when there's content to toggle
         currentViewMode={viewMode === 'album' ? albumViewMode : localViewMode}
-        onToggleViewLayout={() => {
-          if (viewMode === 'album') {
-            setAlbumViewMode(prev => prev === 'grid' ? 'image' : 'grid');
-          } else {
-            setLocalViewMode(prev => prev === 'grid' ? 'image' : 'grid');
-          }
-        }}
+        onToggleViewLayout={
+          (viewMode === 'album' && albumImages.length > 0) || (viewMode === 'local' && files.length > 0)
+            ? () => {
+                if (viewMode === 'album') {
+                  setAlbumViewMode(prev => prev === 'grid' ? 'image' : 'grid');
+                } else {
+                  setLocalViewMode(prev => prev === 'grid' ? 'image' : 'grid');
+                }
+              }
+            : undefined
+        }
         // Toolbar props
         onRefresh={handleRefresh}
         onToggleEdit={() => setIsEditing(!isEditing)}
@@ -1949,18 +1968,6 @@ function App() {
                     onRemoveBackground={handleRemoveBackground}
                     onRenameImage={handleRenameAlbumImage}
                   />
-                  {/* Switch to image view button */}
-                  <button
-                    onClick={() => setAlbumViewMode('image')}
-                    className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-white p-3 rounded-lg transition-colors backdrop-blur-sm"
-                    title="Image View"
-                  >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <rect x="3" y="3" width="18" height="18" rx="2" />
-                      <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" />
-                      <path d="M21 15l-5-5L5 21" />
-                    </svg>
-                  </button>
                 </motion.div>
               ) : albumViewMode === 'image' && currentAlbumImage ? (
                 // Image view - single image viewer
@@ -1975,19 +1982,6 @@ function App() {
                   <div className="w-full h-full p-4">
                     <ImageViewer src={currentAlbumImage} crop={albumImages[safeAlbumIndex]?.crop} annotations={albumImages[safeAlbumIndex]?.annotations} />
                   </div>
-                  {/* Back to grid button */}
-                  <button
-                    onClick={() => setAlbumViewMode('grid')}
-                    className="absolute top-4 left-4 bg-white/10 hover:bg-white/20 text-white p-3 rounded-lg transition-colors backdrop-blur-sm"
-                    title="Grid View"
-                  >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <rect x="3" y="3" width="7" height="7" />
-                      <rect x="14" y="3" width="7" height="7" />
-                      <rect x="3" y="14" width="7" height="7" />
-                      <rect x="14" y="14" width="7" height="7" />
-                    </svg>
-                  </button>
                 </motion.div>
               ) : (
                 <motion.div
@@ -2071,23 +2065,11 @@ function App() {
                     size={gridSize}
                     onRenameImage={handleRenameLocalFile}
                   />
-                  {/* Switch to image view button */}
-                  <button
-                    onClick={() => setLocalViewMode('image')}
-                    className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-white p-3 rounded-lg transition-colors backdrop-blur-sm"
-                    title="Image View"
-                  >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <rect x="3" y="3" width="18" height="18" rx="2" />
-                      <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" />
-                      <path d="M21 15l-5-5L5 21" />
-                    </svg>
-                  </button>
                 </motion.div>
               ) : localViewMode === 'image' && localImage && !isEditing ? (
                 // Image view
                 <motion.div
-                  key="viewer"
+                  key={localViewerKey}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -2096,25 +2078,10 @@ function App() {
                   <div className="w-full h-full p-4">
                     <ImageViewer src={localImage} crop={localCrop} annotations={localAnnotations} />
                   </div>
-                  {/* Back to grid button */}
-                  {files.length > 0 && (
-                    <button
-                      onClick={() => setLocalViewMode('grid')}
-                      className="absolute top-4 left-4 bg-white/10 hover:bg-white/20 text-white p-3 rounded-lg transition-colors backdrop-blur-sm"
-                      title="Grid View"
-                    >
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <rect x="3" y="3" width="7" height="7" />
-                        <rect x="14" y="3" width="7" height="7" />
-                        <rect x="3" y="14" width="7" height="7" />
-                        <rect x="14" y="14" width="7" height="7" />
-                      </svg>
-                    </button>
-                  )}
                 </motion.div>
               ) : !localImage ? (
                 <motion.div
-                  key="dropzone"
+                  key={dropzoneKey}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 0.4 }}
                   exit={{ opacity: 0 }}
