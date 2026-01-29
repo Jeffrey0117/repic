@@ -1874,32 +1874,33 @@ function App() {
 
         {/* Right content area: changes layout based on sidebar position */}
         <div className={`flex-1 flex min-w-0 overflow-hidden ${sidebarPosition === 'bottom' ? 'flex-col' : 'flex-row'}`}>
-          {/* Inner row: (Sidebar if left) + main + InfoPanel */}
-          <div className="flex flex-row flex-1 min-h-0 min-w-0 overflow-hidden">
-            {/* Left Sidebar: Thumbnail Explorer - only when position is left, hidden in grid mode */}
-            {sidebarPosition === 'left' && ((viewMode === 'album' && albumViewMode === 'image' && albumImages.length > 0) || (viewMode === 'local' && localViewMode === 'image' && files.length > 0)) && (
-              <Sidebar
-                files={viewMode === 'album' ? albumImages : files}
-                currentIndex={viewMode === 'album' ? safeAlbumIndex : currentIndex}
-                cacheVersion={cacheVersion}
-                onSelect={viewMode === 'album' ? setAlbumImageIndex : selectImage}
-                mode={viewMode === 'album' ? 'web' : 'local'}
-                isMultiSelectMode={viewMode === 'album' && isMultiSelectMode}
-                selectedIds={selectedImageIds}
-                onToggleSelect={toggleImageSelection}
-                onEnterMultiSelect={() => setIsMultiSelectMode(true)}
-                onExitMultiSelect={exitMultiSelectMode}
-                onDeleteSelected={handleBatchDelete}
-                onDownloadSelected={handleBatchDownload}
-                onUploadSelected={handleBatchUpload}
-                onSelectAll={handleSelectAll}
-                onMoveUp={handleMoveUp}
-                onMoveDown={handleMoveDown}
-                onReorder={viewMode === 'album' ? (from, to) => reorderImages(selectedAlbumId, from, to) : undefined}
-                onContextMenu={viewMode === 'album' ? (e, image) => handleImageContextMenu(e, image, selectedAlbum) : undefined}
-                position={sidebarPosition}
-              />
-            )}
+          {/* Single Sidebar instance: CSS order controls left vs bottom position (avoids remount) */}
+          {((viewMode === 'album' && albumViewMode === 'image' && albumImages.length > 0) || (viewMode === 'local' && localViewMode === 'image' && files.length > 0)) && (
+            <Sidebar
+              files={viewMode === 'album' ? albumImages : files}
+              currentIndex={viewMode === 'album' ? safeAlbumIndex : currentIndex}
+              cacheVersion={cacheVersion}
+              onSelect={viewMode === 'album' ? setAlbumImageIndex : selectImage}
+              mode={viewMode === 'album' ? 'web' : 'local'}
+              isMultiSelectMode={viewMode === 'album' && isMultiSelectMode}
+              selectedIds={selectedImageIds}
+              onToggleSelect={toggleImageSelection}
+              onEnterMultiSelect={() => setIsMultiSelectMode(true)}
+              onExitMultiSelect={exitMultiSelectMode}
+              onDeleteSelected={handleBatchDelete}
+              onDownloadSelected={handleBatchDownload}
+              onUploadSelected={handleBatchUpload}
+              onSelectAll={handleSelectAll}
+              onMoveUp={handleMoveUp}
+              onMoveDown={handleMoveDown}
+              onReorder={viewMode === 'album' ? (from, to) => reorderImages(selectedAlbumId, from, to) : undefined}
+              onContextMenu={viewMode === 'album' ? (e, image) => handleImageContextMenu(e, image, selectedAlbum) : undefined}
+              position={sidebarPosition}
+            />
+          )}
+
+          {/* Inner row: main + InfoPanel */}
+          <div className="flex flex-row flex-1 min-h-0 min-w-0 overflow-hidden" style={{ order: 1 }}>
 
         {/* Center: Main Viewport */}
         <main
@@ -2111,28 +2112,6 @@ function App() {
           mode={viewMode === 'album' ? 'web' : 'local'}
         />
         </div>
-
-        {/* Bottom Sidebar: Thumbnail Explorer - only when position is bottom, hidden in grid mode */}
-        {sidebarPosition === 'bottom' && ((viewMode === 'album' && albumViewMode === 'image' && albumImages.length > 0) || (viewMode === 'local' && localViewMode === 'image' && files.length > 0)) && (
-          <Sidebar
-            files={viewMode === 'album' ? albumImages : files}
-            currentIndex={viewMode === 'album' ? safeAlbumIndex : currentIndex}
-            cacheVersion={cacheVersion}
-            onSelect={viewMode === 'album' ? setAlbumImageIndex : selectImage}
-            mode={viewMode === 'album' ? 'web' : 'local'}
-            isMultiSelectMode={viewMode === 'album' && isMultiSelectMode}
-            selectedIds={selectedImageIds}
-            onToggleSelect={toggleImageSelection}
-            onEnterMultiSelect={() => setIsMultiSelectMode(true)}
-            onExitMultiSelect={exitMultiSelectMode}
-            onDeleteSelected={handleBatchDelete}
-            onDownloadSelected={handleBatchDownload}
-            onUploadSelected={handleBatchUpload}
-            onReorder={viewMode === 'album' ? (from, to) => reorderImages(selectedAlbumId, from, to) : undefined}
-            onContextMenu={viewMode === 'album' ? (e, image) => handleImageContextMenu(e, image, selectedAlbum) : undefined}
-            position={sidebarPosition}
-          />
-        )}
         </div>
       </div>
 

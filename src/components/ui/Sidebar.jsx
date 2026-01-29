@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import { getThumbnail, saveThumbnail, generateThumbnail } from '../../utils/thumbnailCache';
 import { getCachedImage, cacheImage } from '../../utils/offlineCache';
 import { preloadImages, preloadThumbnails, getCached } from '../../utils/imageLoader';
@@ -214,40 +214,46 @@ export const Sidebar = ({
 
     // Track previous files to detect album change
     const prevFilesRef = useRef(files);
-    // Track initial mount to skip smooth scroll on first render (e.g. position switch remount)
+    // Track initial mount to skip smooth scroll on first render
     const isInitialMount = useRef(true);
+    // Track orientation to detect position switch (left ↔ bottom)
+    const prevIsHorizontalRef = useRef(isHorizontal);
 
-    // Scroll to current item when it changes or files change
-    useEffect(() => {
+    // Scroll to current item - useLayoutEffect for instant cases (before paint)
+    useLayoutEffect(() => {
         const container = scrollContainerRef.current;
         if (!container || currentIndex < 0 || files.length === 0) return;
 
-        // Detect if album changed (files array is different)
         const albumChanged = prevFilesRef.current !== files;
+        const orientationChanged = prevIsHorizontalRef.current !== isHorizontal;
         prevFilesRef.current = files;
+        prevIsHorizontalRef.current = isHorizontal;
 
-        // Initial mount or album change: instant scroll (no animation)
-        // Same album navigation after mount: smooth scroll
-        const shouldInstant = isInitialMount.current || albumChanged;
+        const shouldInstant = isInitialMount.current || albumChanged || orientationChanged;
         if (isInitialMount.current) {
             isInitialMount.current = false;
         }
 
-        // Small delay to ensure DOM has updated with new items
-        const timeoutId = setTimeout(() => {
-            const scrollPos = currentIndex * ITEM_SIZE;
-            const behavior = shouldInstant ? 'instant' : 'smooth';
+        const scrollPos = currentIndex * ITEM_SIZE;
 
+        if (shouldInstant) {
+            // Set scroll position directly before browser paints (no flash)
             if (isHorizontal) {
-                const targetScroll = scrollPos - container.clientWidth / 2 + ITEM_SIZE / 2;
-                container.scrollTo({ left: Math.max(0, targetScroll), behavior });
+                container.scrollLeft = Math.max(0, scrollPos - container.clientWidth / 2 + ITEM_SIZE / 2);
             } else {
-                const targetScroll = scrollPos - container.clientHeight / 2 + ITEM_SIZE / 2;
-                container.scrollTo({ top: Math.max(0, targetScroll), behavior });
+                container.scrollTop = Math.max(0, scrollPos - container.clientHeight / 2 + ITEM_SIZE / 2);
             }
-        }, shouldInstant ? 0 : 50);
-
-        return () => clearTimeout(timeoutId);
+        } else {
+            // Smooth scroll for normal navigation
+            const timeoutId = setTimeout(() => {
+                if (isHorizontal) {
+                    container.scrollTo({ left: Math.max(0, scrollPos - container.clientWidth / 2 + ITEM_SIZE / 2), behavior: 'smooth' });
+                } else {
+                    container.scrollTo({ top: Math.max(0, scrollPos - container.clientHeight / 2 + ITEM_SIZE / 2), behavior: 'smooth' });
+                }
+            }, 50);
+            return () => clearTimeout(timeoutId);
+        }
     }, [currentIndex, ITEM_SIZE, isHorizontal, files]);
 
     const handleResizeMouseDown = useCallback((e) => {
@@ -431,7 +437,7 @@ export const Sidebar = ({
                     ? 'w-full border-t border-white/5 flex flex-row'
                     : 'h-full border-r border-white/5 flex flex-col'
             }`}
-            style={isHorizontal ? { height: `${height}px` } : { width: `${width}px` }}
+            style={isHorizontal ? { height: `${height}px`, order: 2 } : { width: `${width}px` }}
         >
             {/* Toolbar for album mode */}
             {mode === 'web' && (
