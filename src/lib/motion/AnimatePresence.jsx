@@ -59,6 +59,8 @@ export function AnimatePresence({
         onExitComplete?.();
       }, exitDuration);
     } else {
+      // Clear any stale exiting children that weren't cleaned up
+      setExitingChildren(prev => prev.length > 0 ? [] : prev);
       setShowCurrent(true);
     }
 
@@ -88,14 +90,16 @@ export function AnimatePresence({
     });
   }
 
-  // Add exiting children
+  // Add exiting children (pointer-events disabled to prevent blocking current content)
   exitingChildren.forEach(child => {
     rendered.push(
       <AnimatePresenceContext.Provider
         key={child.key}
         value={{ isExiting: true }}
       >
-        {cloneElement(child)}
+        <div style={{ pointerEvents: 'none' }}>
+          {cloneElement(child)}
+        </div>
       </AnimatePresenceContext.Provider>
     );
   });
